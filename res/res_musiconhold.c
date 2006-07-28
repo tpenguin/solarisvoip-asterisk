@@ -166,6 +166,10 @@ static void ast_moh_free_class(struct mohclass **class)
 		members = members->next;
 		free(mtmp);
 	}
+	if ((*class)->thread) {
+		pthread_cancel((*class)->thread);
+		(*class)->thread = 0;
+	}
 	free(*class);
 	*class = NULL;
 }
@@ -427,7 +431,7 @@ static int spawn_mp3(struct mohclass *class)
 		sleep(respawn_time - (time(NULL) - class->start));
 	}
 	time(&class->start);
-	class->pid = fork();
+	class->pid = fork1();
 	if (class->pid < 0) {
 		close(fds[0]);
 		close(fds[1]);
@@ -440,13 +444,14 @@ static int spawn_mp3(struct mohclass *class)
 		/* Stdout goes to pipe */
 		dup2(fds[1], STDOUT_FILENO);
 		/* Close unused file descriptors */
-		for (x=3;x<8192;x++) {
-			if (-1 != fcntl(x, F_GETFL)) {
+		for (x=3; x<getdtablesize(); x++) {
+			if (-1 != fcntl(x, F_GETFL) && x != fds[1]) {
 				close(x);
 			}
 		}
 		/* Child */
 		chdir(class->dir);
+		setpgid(0, getpid());
 		if (ast_test_flag(class, MOH_CUSTOM)) {
 			execv(argv[0], argv);
 		} else {
@@ -459,7 +464,7 @@ static int spawn_mp3(struct mohclass *class)
 		}
 		ast_log(LOG_WARNING, "Exec failed: %s\n", strerror(errno));
 		close(fds[1]);
-		exit(1);
+		_exit(1);
 	} else {
 		/* Parent */
 		close(fds[1]);
@@ -482,17 +487,20 @@ static void *monmp3thread(void *data)
 	tv.tv_sec = 0;
 	tv.tv_usec = 0;
 	for(;/* ever */;) {
+		pthread_testcancel();
 		/* Spawn mp3 player if it's not there */
 		if (class->srcfd < 0) {
 			if ((class->srcfd = spawn_mp3(class)) < 0) {
 				ast_log(LOG_WARNING, "Unable to spawn mp3player\n");
 				/* Try again later */
 				sleep(500);
+				pthread_testcancel();
 			}
 		}
 		if (class->pseudofd > -1) {
 			/* Pause some amount of time */
 			res = read(class->pseudofd, buf, sizeof(buf));
+			pthread_testcancel();
 		} else {
 			long delta;
 			/* Reliable sleep */
@@ -503,6 +511,7 @@ static void *monmp3thread(void *data)
 			if (delta < MOH_MS_INTERVAL) {	/* too early */
 				tv = ast_tvadd(tv, ast_samp2tv(MOH_MS_INTERVAL, 1000));	/* next deadline */
 				usleep(1000 * (MOH_MS_INTERVAL - delta));
+				pthread_testcancel();
 			} else {
 				ast_log(LOG_NOTICE, "Request to schedule in the past?!?!\n");
 				tv = tv_tmp;
@@ -518,14 +527,16 @@ static void *monmp3thread(void *data)
 			if (!res2) {
 				close(class->srcfd);
 				class->srcfd = -1;
+				pthread_testcancel();
 				if (class->pid) {
-					kill(class->pid, SIGKILL);
+					killpg(class->pid, SIGKILL);
 					class->pid = 0;
 				}
 			} else
 				ast_log(LOG_DEBUG, "Read %d bytes of audio while expecting %d\n", res2, len);
 			continue;
 		}
+		pthread_testcancel();
 		ast_mutex_lock(&moh_lock);
 		moh = class->members;
 		while (moh) {
@@ -1078,7 +1089,7 @@ static void ast_moh_destroy(void)
 			stime = time(NULL) + 2;
 			pid = moh->pid;
 			moh->pid = 0;
-			kill(pid, SIGKILL);
+			killpg(pid, SIGKILL);
 			while ((ast_wait_for_input(moh->srcfd, 100) > 0) && (bytes = read(moh->srcfd, buff, 8192)) && time(NULL) < stime) {
 				tbytes = tbytes + bytes;
 			}
