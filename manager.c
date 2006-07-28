@@ -672,6 +672,37 @@ static int action_hangup(struct mansession *s, struct message *m)
 	return 0;
 }
 
+static char mandescr_sendtext[] = 
+"Description: Send a text message to a channel\n"
+"Variables: \n"
+"      Channel: The channel name to send the text message to\n"
+"      Value: The text message to send\n";
+
+static int action_sendtext(struct mansession *s, struct message *m)
+{
+	struct ast_channel *c = NULL;
+	char *name = astman_get_header(m, "Channel");
+	char *msg = astman_get_header(m, "Value");
+	int res;
+       if (ast_strlen_zero(name)) {
+               astman_send_error(s, m, "No channel specified");
+               return 0;
+       }
+       if (ast_strlen_zero(msg)) {
+               astman_send_error(s, m, "No value specified");
+               return 0;
+       }
+       c = ast_get_channel_by_name_locked(name);
+       if (!c) {
+               astman_send_error(s, m, "No such channel");
+               return 0;
+       }
+       res = ast_sendtext(c, msg);
+       ast_mutex_unlock(&c->lock);
+       astman_send_ack(s, m, res>=0 ? "Message sent" : " Message send failed");
+       return 0;
+}
+
 static char mandescr_setvar[] = 
 "Description: Set a global or local channel variable.\n"
 "Variables: (Names marked with * are required)\n"
@@ -1664,6 +1695,7 @@ int init_manager(void)
 		ast_manager_register2("MailboxStatus", EVENT_FLAG_CALL, action_mailboxstatus, "Check Mailbox", mandescr_mailboxstatus );
 		ast_manager_register2("MailboxCount", EVENT_FLAG_CALL, action_mailboxcount, "Check Mailbox Message Count", mandescr_mailboxcount );
 		ast_manager_register2("ListCommands", 0, action_listcommands, "List available manager commands", mandescr_listcommands);
+		ast_manager_register2("Sendtext", EVENT_FLAG_CALL, action_sendtext, "send a text message to a channel", mandescr_sendtext);
 
 		ast_cli_register(&show_mancmd_cli);
 		ast_cli_register(&show_mancmds_cli);
