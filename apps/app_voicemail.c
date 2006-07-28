@@ -51,6 +51,7 @@
 #include <dirent.h>
 
 #include "asterisk.h"
+#include "ast_template.h"
 
 ASTERISK_FILE_VERSION(__FILE__, "$Revision: 19394 $")
 
@@ -1754,7 +1755,7 @@ static int sendmail(char *srcemail, struct ast_vm_user *vmu, int msgnum, char *c
 
 			fprintf(p, "--%s\n", bound);
 		}
-		fprintf(p, "Content-Type: text/plain; charset=%s\nContent-Transfer-Encoding: 8bit\n\n", charset);
+		fprintf(p, "Content-Type: text/html; charset=%s\nContent-Transfer-Encoding: 8bit\n\n", charset);
 		if (emailbody) {
 			struct ast_channel *ast = ast_channel_alloc(0);
 			if (ast) {
@@ -1769,11 +1770,28 @@ static int sendmail(char *srcemail, struct ast_vm_user *vmu, int msgnum, char *c
 				ast_channel_free(ast);
 			} else ast_log(LOG_WARNING, "Cannot allocate the channel for variables substitution\n");
 		} else {
-			fprintf(p, "Dear %s:\n\n\tJust wanted to let you know you were just left a %s long message (number %d)\n"
-
-			"in mailbox %s from %s, on %s so you might\n"
-			"want to check it when you get a chance.  Thanks!\n\n\t\t\t\t--Asterisk\n\n", vmu->fullname, 
-			dur, msgnum + 1, mailbox, (cidname ? cidname : (cidnum ? cidnum : "an unknown caller")), date);
+			char *template = ast_read_template("/etc/opt/asterisk/vm_template.html");
+			if (!template) {
+				ast_log(LOG_ERROR, "Unable to read template in voicemail.\n");
+			} else {
+				
+				int vmlen = strlen(template)*3 + 200;
+				char *outbuffer = malloc(vmlen);
+				memset(outbuffer, 0, vmlen);
+				if (!outbuffer) {
+					ast_log(LOG_ERROR, "Cannot allocate workspace for variable substitution.\n");
+				} else {
+					struct ast_channel *ast = ast_channel_alloc(0);
+					if (ast) {
+						prep_email_sub_vars(ast, vmu, msgnum + 1, context, mailbox, cidnum, cidname, dur, date, outbuffer, vmlen);
+						pbx_substitute_variables_helper(ast, template, outbuffer, vmlen);
+						fprintf(p, "%s\n\n", outbuffer);
+					} else ast_log(LOG_WARNING, "Cannot allocate the channel for variable substitution.\n");
+					free(outbuffer);
+					ast_channel_free(ast);
+				}
+				free(template);
+			}
 		}
 		if (attach_user_voicemail) {
 			/* Eww. We want formats to tell us their own MIME type */
