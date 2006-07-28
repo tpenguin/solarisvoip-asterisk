@@ -70,7 +70,7 @@ ifneq (${OSARCH},Darwin)
 endif
 
 ifeq (${OSARCH},SunOS)
-  SOLINK+=-lrt
+  SOLINK+=-R/usr/sfw/lib -L/usr/sfw/lib -R/opt/lib -L/opt/lib -lrt
 endif
 
 ifneq ($(wildcard $(CROSS_COMPILE_TARGET)/usr/include/linux/ixjuser.h)$(wildcard $(CROSS_COMPILE_TARGET)/usr/local/include/ixjuser.h),)
@@ -92,7 +92,7 @@ ifneq ($(wildcard $(CROSS_COMPILE_TARGET)/usr/include/alsa/asoundlib.h),)
   CHANNEL_LIBS+=chan_alsa.so
 endif
 
-ifneq ($(wildcard $(CROSS_COMPILE_TARGET)/usr/lib/libpri.so.1)$(wildcard $(CROSS_COMPILE_TARGET)/usr/local/lib/libpri.so.1),)
+ifneq ($(wildcard $(CROSS_COMPILE_TARGET)/usr/lib/libpri.so.1)$(wildcard $(CROSS_COMPILE_TARGET)/usr/local/lib/libpri.so.1)$(wildcard $(CROSS_COMPILE_TARGET)/opt/lib/libpri.so.1),)
   CFLAGS+=-DZAPATA_PRI
   ZAPPRI=-lpri
 endif
@@ -110,7 +110,7 @@ ifneq ($(wildcard alsa-monitor.h),)
 endif
 
 ifndef WITHOUT_ZAPTEL
-ifneq ($(wildcard $(CROSS_COMPILE_TARGET)/usr/include/linux/zaptel.h)$(wildcard $(CROSS_COMPILE_TARGET)/usr/local/include/zaptel.h)$(wildcard $(CROSS_COMPILE_TARGET)/usr/pkg/include/zaptel.h),)
+ifneq ($(wildcard $(CROSS_COMPILE_TARGET)/usr/include/linux/zaptel.h)$(wildcard $(CROSS_COMPILE_TARGET)/usr/local/include/zaptel.h)$(wildcard $(CROSS_COMPILE_TARGET)/usr/pkg/include/zaptel.h)$(wildcard $(CROSS_COMPILE_TARGET)/opt/include/zaptel.h),)
   ifeq (${OSARCH},NetBSD)
     SOLINK+=-L$(CROSS_COMPILE_TARGET)/usr/pkg/lib
   endif

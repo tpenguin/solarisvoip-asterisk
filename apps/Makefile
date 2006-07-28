@@ -45,7 +45,7 @@ APPS=app_dial.so app_playback.so app_voicemail.so app_directory.so app_mp3.so\
 #APPS+=app_rpt.so
 
 ifndef WITHOUT_ZAPTEL
-ifneq ($(wildcard $(CROSS_COMPILE_TARGET)/usr/include/linux/zaptel.h)$(wildcard $(CROSS_COMPILE_TARGET)/usr/local/include/zaptel.h),)
+ifneq ($(wildcard $(CROSS_COMPILE_TARGET)/usr/include/linux/zaptel.h)$(wildcard $(CROSS_COMPILE_TARGET)/usr/local/include/zaptel.h)$(wildcard $(CROSS_COMPILE_TARGET)/opt/include/zaptel.h),)
   APPS+=app_zapras.so app_meetme.so app_flash.so app_zapbarge.so app_zapscan.so app_page.so
 endif
 endif # WITHOUT_ZAPTEL
@@ -58,11 +58,24 @@ ifeq ($(findstring BSD,${OSARCH}),BSD)
 CFLAGS+=-I$(CROSS_COMPILE_TARGET)/usr/local/include -L$(CROSS_COMPILE_TARGET)/usr/local/lib
 endif
 
+ifeq ($(findstring SunOS,${OSARCH}),SunOS)
+CFLAGS+=-I/opt/csw/include -I/opt/include
+SOLINK+=-R/opt/csw/lib -L/opt/csw/lib -R/opt/lib -L/opt/lib
+endif
+
 CURLLIBS=$(shell $(CROSS_COMPILE_BIN)curl-config --libs)
 ifneq ($(shell if [[ 0x`$(CROSS_COMPILE_BIN)curl-config --vernum` -ge 0x70907 ]]; then echo "OK" ; fi),)
   ifneq (${CURLLIBS},)
     APPS+=app_curl.so
   endif 
+endif
+
+# On Sun, we will test for CSW curl
+ifeq ($(findstring SunOS,${OSARCH}),SunOS)
+  CURLLIBS=$(shell /opt/csw/bin/curl-config --libs)
+  ifneq (${CURLLIBS},)
+    APPS+=app_curl.so
+  endif
 endif
 
 ifeq (${OSARCH},CYGWIN)

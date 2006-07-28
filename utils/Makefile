@@ -33,6 +33,7 @@ endif
 ifeq (${OSARCH},SunOS)
   SOL=../strcompat.o
   SOLLIBS=-lsocket -lnsl
+  LIBS=-lsocket
 endif
 
 all: depend $(TARGET)
@@ -49,7 +50,7 @@ clean:
 	rm -f ast_expr2.o ast_expr2f.o
 
 astman: astman.o ../md5.o
-	$(CC) $(CFLAGS) -o astman astman.o ../md5.o -lnewt
+	$(CC) $(CFLAGS) -o astman astman.o ../md5.o -lnewt $(SOLLIBS)
 
 stereorize: stereorize.o frame.o
 	$(CC) $(CFLAGS) -o stereorize stereorize.o frame.o -lm

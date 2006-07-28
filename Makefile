@@ -121,6 +121,13 @@ ifneq ($(OSARCH),SunOS)
   ASTMANDIR=$(INSTALL_PREFIX)/usr/share/man
   MODULES_DIR=$(ASTLIBDIR)/modules
   AGI_DIR=$(ASTVARLIBDIR)/agi-bin
+  ISA=$(shell uname -p)
+  PROCTYPE=$(shell uname -m)
+  ifeq ($(PROCTYPE),sun4u)
+  PROC=v9
+  else
+  PROC=k8
+  endif
 else
   ASTLIBDIR=$(INSTALL_PREFIX)/opt/asterisk/lib
   ASTVARLIBDIR=$(INSTALL_PREFIX)/var/opt/asterisk/lib
@@ -284,7 +291,7 @@ endif
 
 ifeq ($(OSARCH),SunOS)
   ASTCFLAGS+=-Wcast-align -DSOLARIS
-  INCLUDE+=-Iinclude/solaris-compat -I$(CROSS_COMPILE_TARGET)/usr/local/ssl/include
+  INCLUDE+=-Iinclude/solaris-compat -L/usr/sfw/lib -R/usr/sfw/lib -I$(CROSS_COMPILE_TARGET)/usr/local/ssl/include
 endif
 
 ifeq ($(findstring CYGWIN,$(OSARCH)),CYGWIN)
@@ -299,8 +306,8 @@ endif
 
 ifndef WITHOUT_ZAPTEL
 
-ifneq ($(wildcard $(CROSS_COMPILE_TARGET)/usr/include/linux/zaptel.h)$(wildcard $(CROSS_COMPILE_TARGET)/usr/local/include/zaptel.h)$(wildcard $(CROSS_COMPILE_TARGET)/usr/pkg/include/zaptel.h),)
-  ASTCFLAGS+=-DZAPTEL_OPTIMIZATIONS
+ifneq ($(wildcard $(CROSS_COMPILE_TARGET)/usr/include/linux/zaptel.h)$(wildcard $(CROSS_COMPILE_TARGET)/usr/local/include/zaptel.h)$(wildcard $(CROSS_COMPILE_TARGET)/usr/pkg/include/zaptel.h)$(wildcard $(CROSS_COMPILE_TARGET)/opt/include/zaptel.h),)
+  ASTCFLAGS+=-I/opt/include -DZAPTEL_OPTIMIZATIONS
 endif
 
 endif # WITHOUT_ZAPTEL
@@ -361,7 +368,7 @@ endif
 ifeq ($(OSARCH),Linux)
   LIBS+=-ldl -lpthread -lncurses -lm -lresolv  #-lnjamd
 else
-  LIBS+=-lncurses -lm
+  LIBS+=-lm
 endif
 
 ifeq ($(OSARCH),Darwin)
@@ -391,7 +398,7 @@ ifeq ($(OSARCH),OpenBSD)
 endif
 
 ifeq ($(OSARCH),SunOS)
-  LIBS+=-lpthread -ldl -lnsl -lsocket -lresolv -L$(CROSS_COMPILE_TARGET)/usr/local/ssl/lib
+  LIBS+=-R/usr/sfw/lib -L/usr/sfw/lib -lpthread -ldl -lnsl -lsocket -lresolv -L$(CROSS_COMPILE_TARGET)/usr/local/ssl/lib -lmtmalloc -ltermcap
   OBJS+=strcompat.o
   ASTLINK=
   SOLINK=-shared -fpic -L$(CROSS_COMPILE_TARGET)/usr/local/ssl/lib
@@ -433,6 +440,20 @@ endif
 
 noclean: depend asterisk subdirs
 
+REV	= $(shell date +'%Y.%m.%d.%H.%M')
+ARCH	= $(shell pkgparam SUNWcsr ARCH)
+PKGARCHIVE = $(shell pwd)/$(shell uname -s)-$(shell uname -r).$(shell uname -m)
+
+pkg: all $(PKGARCHIVE) pkginfo
+	pkgmk -a `uname -m` -d $(PACKAGEARCHIVE) -f prototype
+	pkgtrans -s $(PACKAGEARCHIVE) SVasterisk-`uname -m`-`uname -r`.pkg
+
+$(PKGARCHIVE):
+	test -d $@ || mkdir -p $@
+
+pkginfo:
+	sed -e 's/<version>/$(ASTERISKVERSIONNUM),REV=$(REV)/' pkginfo_src | \
+	sed -e 's/<arch>/$(ARCH)/' > $@ 
 editline/config.h:
 	cd editline && unset CFLAGS LIBS && ./configure ; \
 
