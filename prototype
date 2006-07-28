@@ -41,6 +41,7 @@ f none opt/asterisk/lib/modules/app_senddtmf.so=apps/app_senddtmf.so 0755 root r
 f none opt/asterisk/lib/modules/app_parkandannounce.so=apps/app_parkandannounce.so 0755 root root
 f none opt/asterisk/lib/modules/app_setcidname.so=apps/app_setcidname.so 0755 root root
 f none opt/asterisk/lib/modules/app_lookupcidname.so=apps/app_lookupcidname.so 0755 root root
+f none opt/asterisk/lib/modules/app_curl.so=apps/app_curl.so 0755 root root
 f none opt/asterisk/lib/modules/app_macro.so=apps/app_macro.so 0755 root root
 f none opt/asterisk/lib/modules/app_authenticate.so=apps/app_authenticate.so 0755 root root
 f none opt/asterisk/lib/modules/app_softhangup.so=apps/app_softhangup.so 0755 root root
