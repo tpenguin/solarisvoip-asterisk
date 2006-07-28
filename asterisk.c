@@ -764,7 +764,7 @@ static void child_handler(int sig)
 	/*
 	 * Reap all dead children -- not just one
 	 */
-	for (n = 0; wait4(-1, &status, WNOHANG, NULL) > 0; n++)
+	for (n = 0; wait4(-1, &status, WNOHANG, NULL) >= 0; n++)
 		;
 	if (n == 0 && option_debug)	
 		printf("Huh?  Child handler, but nobody there?\n");
