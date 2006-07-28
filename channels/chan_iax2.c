@@ -1143,7 +1143,7 @@ static void destroy_firmware(struct iax_firmware *cur)
 {
 	/* Close firmware */
 	if (cur->fwh) {
-		munmap(cur->fwh, ntohl(cur->fwh->datalen) + sizeof(*(cur->fwh)));
+		munmap((void*)cur->fwh, ntohl(cur->fwh->datalen) + sizeof(*(cur->fwh)));
 	}
 	close(cur->fd);
 	free(cur);
@@ -1242,7 +1242,7 @@ static int try_firmware(char *s)
 		close(fd);
 		return -1;
 	}
-	fwh = mmap(NULL, stbuf.st_size, PROT_READ, MAP_PRIVATE, fd, 0); 
+	fwh = (struct ast_iax2_firmware_header *)mmap(NULL, stbuf.st_size, PROT_READ, MAP_PRIVATE, fd, 0); 
 	if (!fwh) {
 		ast_log(LOG_WARNING, "mmap failed: %s\n", strerror(errno));
 		close(fd);
@@ -1253,7 +1253,7 @@ static int try_firmware(char *s)
 	MD5Final(sum, &md5);
 	if (memcmp(sum, fwh->chksum, sizeof(sum))) {
 		ast_log(LOG_WARNING, "Firmware file '%s' fails checksum\n", s);
-		munmap(fwh, stbuf.st_size);
+		munmap((void*)fwh, stbuf.st_size);
 		close(fd);
 		return -1;
 	}
@@ -1266,7 +1266,7 @@ static int try_firmware(char *s)
 				break;
 			/* This version is no newer than what we have.  Don't worry about it.
 			   We'll consider it a proper load anyhow though */
-			munmap(fwh, stbuf.st_size);
+			munmap((void*)fwh, stbuf.st_size);
 			close(fd);
 			return 0;
 		}
@@ -1284,7 +1284,7 @@ static int try_firmware(char *s)
 	}
 	if (cur) {
 		if (cur->fwh) {
-			munmap(cur->fwh, cur->mmaplen);
+			munmap((void*)cur->fwh, cur->mmaplen);
 		}
 		if (cur->fd > -1)
 			close(cur->fd);
