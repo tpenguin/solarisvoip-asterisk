@@ -2,6 +2,7 @@
 
 #include <sys/types.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "asterisk/compat.h"
 
