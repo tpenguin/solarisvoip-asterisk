@@ -31,6 +31,12 @@ noload => pbx_kdeconsole.so
 ;
 noload => app_intercom.so
 ;
+; iSP Services CNAM lookup
+noload => app_lookupname.so
+;
+; Curl
+noload => app_curl.so
+;
 ; The 'modem' channel driver and its subdrivers are
 ; obsolete, don't load them.
 ;
