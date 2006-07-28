@@ -83,7 +83,7 @@ struct ast_ha {
 };
 
 /* Default IP - if not otherwise set, don't breathe garbage */
-static struct in_addr __ourip = { 0x00000000 };
+static struct in_addr __ourip;
 
 struct my_ifreq {
 	char ifrn_name[IFNAMSIZ];	/* Interface name, e.g. "eth0", "ppp0", etc.  */
@@ -287,6 +287,7 @@ int ast_lookup_iface(char *iface, struct in_addr *address)
 	close(mysock);
 	if (res < 0) {
 		ast_log(LOG_WARNING, "Unable to get IP of %s: %s\n", iface, strerror(errno));
+		memset((void*)&__ourip, 0, sizeof(__ourip));
 		memcpy((char *)address, (char *)&__ourip, sizeof(__ourip));
 		return -1;
 	} else {
