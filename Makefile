@@ -445,8 +445,8 @@ ARCH	= $(shell pkgparam SUNWcsr ARCH)
 PKGARCHIVE = $(shell pwd)/$(shell uname -s)-$(shell uname -r).$(shell uname -m)
 
 pkg: all $(PKGARCHIVE) pkginfo
-	pkgmk -a `uname -m` -d $(PACKAGEARCHIVE) -f prototype
-	pkgtrans -s $(PACKAGEARCHIVE) SVasterisk-`uname -m`-`uname -r`.pkg
+	pkgmk -oa `uname -m` -d $(PKGARCHIVE) -f prototype
+	pkgtrans -s $(PKGARCHIVE) SVasterisk-`uname -m`-`uname -r`.pkg SVasterisk
 
 $(PKGARCHIVE):
 	test -d $@ || mkdir -p $@
@@ -454,6 +454,7 @@ $(PKGARCHIVE):
 pkginfo:
 	sed -e 's/<version>/$(ASTERISKVERSIONNUM),REV=$(REV)/' pkginfo_src | \
 	sed -e 's/<arch>/$(ARCH)/' > $@ 
+
 editline/config.h:
 	cd editline && unset CFLAGS LIBS && ./configure ; \
 

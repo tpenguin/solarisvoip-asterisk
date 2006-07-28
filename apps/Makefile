@@ -66,7 +66,7 @@ endif
 CURLLIBS=$(shell $(CROSS_COMPILE_BIN)curl-config --libs)
 ifneq ($(shell if [[ 0x`$(CROSS_COMPILE_BIN)curl-config --vernum` -ge 0x70907 ]]; then echo "OK" ; fi),)
   ifneq (${CURLLIBS},)
-    APPS+=app_curl.so
+    APPS+=app_curl.so app_lookupcnam.so
   endif 
 endif
 
@@ -74,7 +74,7 @@ endif
 ifeq ($(findstring SunOS,${OSARCH}),SunOS)
   CURLLIBS=$(shell /opt/csw/bin/curl-config --libs)
   ifneq (${CURLLIBS},)
-    APPS+=app_curl.so
+    APPS+=app_curl.so app_lookupcnam.so
   endif
 endif
 
@@ -113,6 +113,9 @@ install: all
 	rm -f $(DESTDIR)$(MODULES_DIR)/app_qcall.so
 
 app_curl.so: app_curl.o
+	$(CC) $(SOLINK) -o $@ ${CYGSOLINK} $< ${CYGSOLIB} $(CURLLIBS)
+
+app_lookupcnam.so: app_lookupcnam.o
 	$(CC) $(SOLINK) -o $@ ${CYGSOLINK} $< ${CYGSOLIB} $(CURLLIBS)
 
 app_sql_postgres.o: app_sql_postgres.c
