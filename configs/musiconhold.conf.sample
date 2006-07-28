@@ -3,8 +3,9 @@
 ;
 
 [default]
-mode=quietmp3
-directory=/var/lib/asterisk/mohmp3
+mode=custom
+directory=/var/opt/asterisk/lib/mohmp3
+application=/opt/csw/bin/mpg123 -q -r 8000 -f 8192 -b 2048 --mono -s
 
 ; valid mode options:
 ; quietmp3 	-- default
