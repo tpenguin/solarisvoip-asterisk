@@ -548,6 +548,7 @@ clean:
 	@if [ -d mpg123-0.59r ]; then $(MAKE) -C mpg123-0.59r clean; fi
 	$(MAKE) -C db1-ast clean
 	$(MAKE) -C stdtime clean
+	rm pkginfo
 
 datafiles: all
 	if [ x`$(ID) -un` = xroot ]; then sh mkpkgconfig $(DESTDIR)/usr/lib/pkgconfig; fi
