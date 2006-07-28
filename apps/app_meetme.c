@@ -85,7 +85,12 @@ static const char *descrip =
 "      'e' -- select an empty conference\n"
 "      'E' -- select an empty pinless conference\n"
 "      'i' -- announce user join/leave\n"
-"      'm' -- set monitor only mode (Listen only, no talking)\n"
+"             Setting ${MEETME_PRERECINTROUSER} to an existing sound file (.sln)"
+"             containing a pre-recorded intro for the user will make meetme use it\n"
+"             instead of asking the user to record his intro when logging in to\n"
+"             the conference\n"
+"      'l' -- set listen only mode (Listen only, no talking)\n"
+"      'm' -- set initially muted by admin\n"
 "      'M' -- enable music on hold when the conference has a single caller\n"
 "      'p' -- allow user to exit the conference by pressing '#'\n"
 "      'P' -- always prompt for the pin even if it is specified\n"
@@ -96,6 +101,10 @@ static const char *descrip =
 "      's' -- Present menu (user or admin) when '*' is received ('send' to menu)\n"
 "      't' -- set talk only mode. (Talk only, no listening)\n"
 "      'T' -- set talker detection (sent to manager interface and meetme list)\n"
+"      'o' -- set talker optimization - treats talkers who aren't speaking as\n"
+"             being muted, meaning (a) No encode is done on transmission and\n"
+"             (b) Received audio that is not registered as talking is omitted\n"
+"             causing no buildup in background noise\n"
 "      'v' -- video mode\n"
 "      'w' -- wait until the marked user enters the conference\n"
 "      'x' -- close the conference when last marked user exits\n"
@@ -178,8 +187,9 @@ static int audio_buffers;			/* The number of audio buffers to be allocated on ps
 
 #define DEFAULT_AUDIO_BUFFERS 32		/* each buffer is 20ms, so this is 640ms total */
 
-#define ADMINFLAG_MUTED (1 << 1)		/* User is muted */
-#define ADMINFLAG_KICKME (1 << 2)		/* User is kicked */
+#define ADMINFLAG_MUTED (1 << 1)	/* User is muted by admin */
+#define ADMINFLAG_SELFMUTED (1 << 2)	/* User muted self */
+#define ADMINFLAG_KICKME (1 << 3)	/* User is kicked */
 #define MEETME_DELAYDETECTTALK 		300
 #define MEETME_DELAYDETECTENDTALK 	1000
 
@@ -228,14 +238,18 @@ static void *recordthread(void *args);
 #define CONFFLAG_EMPTYNOPIN (1 << 20)
 #define CONFFLAG_ALWAYSPROMPT (1 << 21)
 #define CONFFLAG_ANNOUNCEUSERCOUNT (1 << 22)	/* If set, when user joins the conference, they will be told the number of users that are already in */
+#define CONFFLAG_OPTIMIZETALKER (1 << 23)      /* If set, treats talking users as muted users */
+#define CONFFLAG_STARTMUTED (1 << 24)
 
 
 AST_APP_OPTIONS(meetme_opts, {
 	AST_APP_OPTION('a', CONFFLAG_ADMIN ),
 	AST_APP_OPTION('c', CONFFLAG_ANNOUNCEUSERCOUNT ),
 	AST_APP_OPTION('T', CONFFLAG_MONITORTALKER ),
+	AST_APP_OPTION('o', CONFFLAG_OPTIMIZETALKER ),
 	AST_APP_OPTION('i', CONFFLAG_INTROUSER ),
-	AST_APP_OPTION('m', CONFFLAG_MONITOR ),
+	AST_APP_OPTION('l', CONFFLAG_MONITOR ),
+	AST_APP_OPTION('m', CONFFLAG_STARTMUTED ),
 	AST_APP_OPTION('p', CONFFLAG_POUNDEXIT ),
 	AST_APP_OPTION('s', CONFFLAG_STARMENU ),
 	AST_APP_OPTION('t', CONFFLAG_TALKER ),
@@ -824,6 +838,7 @@ static int conf_run(struct ast_channel *chan, struct ast_conference *conf, int c
 	char meetmesecs[30] = "";
 	char exitcontext[AST_MAX_CONTEXT] = "";
 	char recordingtmp[AST_MAX_EXTENSION] = "";
+	char *preintrousertmp;
 	int dtmf;
 	ZT_BUFFERINFO bi;
 	char __buf[CONF_SIZE + AST_FRIENDLY_OFFSET];
@@ -886,7 +901,7 @@ static int conf_run(struct ast_channel *chan, struct ast_conference *conf, int c
 
 	user->chan = chan;
 	user->userflags = confflags;
-	user->adminflags = 0;
+	user->adminflags = (confflags & CONFFLAG_STARTMUTED) ? ADMINFLAG_MUTED : 0;
 	user->talking = -1;
 	conf->users++;
 	ast_mutex_unlock(&conflock);
@@ -904,9 +919,16 @@ static int conf_run(struct ast_channel *chan, struct ast_conference *conf, int c
 		snprintf(user->namerecloc, sizeof(user->namerecloc),
 			 "%s/meetme/meetme-username-%s-%d", ast_config_AST_SPOOL_DIR,
 			 conf->confno, user->user_no);
-		res = ast_record_review(chan, "vm-rec-name", user->namerecloc, 10, "sln", &duration, NULL);
-		if (res == -1)
-			goto outrun;
+		/* checking pre-recorded user intro */
+		if ((preintrousertmp = pbx_builtin_getvar_helper(chan, "MEETME_PRERECINTROUSER")) && (ast_fileexists(preintrousertmp, "sln", NULL) > 0)) {
+			if (option_verbose > 1)
+				ast_verbose(VERBOSE_PREFIX_2 "Pre-recorded user intro is: '%s'\n", preintrousertmp);
+			ast_filecopy(preintrousertmp, user->namerecloc, "sln");
+		} else {
+			if (option_verbose > 1)
+				ast_verbose(VERBOSE_PREFIX_2 "Pre-recorded user intro not present: recording new intro\n");
+			ast_record_review(chan, "vm-rec-name", user->namerecloc, 10, "sln", &duration, NULL);
+		}
 	}
 
 	if (!(confflags & CONFFLAG_QUIET)) {
@@ -1111,7 +1133,7 @@ static int conf_run(struct ast_channel *chan, struct ast_conference *conf, int c
 			x = 1;
 			ast_channel_setoption(chan, AST_OPTION_TONE_VERIFY, &x, sizeof(char), 0);
 		}	
-		if (confflags & CONFFLAG_MONITORTALKER && !(dsp = ast_dsp_new())) {
+		if (confflags & (CONFFLAG_MONITORTALKER | CONFFLAG_OPTIMIZETALKER) && !(dsp = ast_dsp_new())) {
 			ast_log(LOG_WARNING, "Unable to allocate DSP!\n");
 			res = -1;
 		}
@@ -1227,39 +1249,49 @@ static int conf_run(struct ast_channel *chan, struct ast_conference *conf, int c
 				break;
 			}
 	
-			/* Check if the admin changed my modes */
-			if (user->adminflags) {			
-				/* Set the new modes */
-				if ((user->adminflags & ADMINFLAG_MUTED) && (ztc.confmode & ZT_CONF_TALKER)) {
-					ztc.confmode ^= ZT_CONF_TALKER;
-					if (ioctl(fd, ZT_SETCONF, &ztc)) {
-						ast_log(LOG_WARNING, "Error setting conference - Un/Mute \n");
-						ret = -1;
-						break;
-					}
-				}
-				if (!(user->adminflags & ADMINFLAG_MUTED) && !(confflags & CONFFLAG_MONITOR) && !(ztc.confmode & ZT_CONF_TALKER)) {
-					ztc.confmode |= ZT_CONF_TALKER;
-					if (ioctl(fd, ZT_SETCONF, &ztc)) {
-						ast_log(LOG_WARNING, "Error setting conference - Un/Mute \n");
-						ret = -1;
-						break;
-					}
-				}
-				if (user->adminflags & ADMINFLAG_KICKME) {
-					/* You have been kicked. */
-					if (!ast_streamfile(chan, "conf-kicked", chan->language))
-						ast_waitstream(chan, "");
-					ret = 0;
+			/* Check if my modes have changed */
+
+			/* If I should be muted but am still talker, mute me */
+			if ((user->adminflags & (ADMINFLAG_MUTED | ADMINFLAG_SELFMUTED)) && (ztc.confmode & ZT_CONF_TALKER)) {
+				ztc.confmode ^= ZT_CONF_TALKER;
+				if (ioctl(fd, ZT_SETCONF, &ztc)) {
+					ast_log(LOG_WARNING, "Error setting conference - Un/Mute \n");
+					ret = -1;
 					break;
 				}
-			} else if (!(confflags & CONFFLAG_MONITOR) && !(ztc.confmode & ZT_CONF_TALKER)) {
+
+				manager_event(EVENT_FLAG_CALL, "MeetmeMute", 
+						"Channel: %s\r\n"
+						"Uniqueid: %s\r\n"
+						"Meetme: %s\r\n"
+						"Usernum: %i\r\n",
+						chan->name, chan->uniqueid, conf->confno, user->user_no);
+			}
+
+			/* If I should be un-muted but am not talker, un-mute me */
+			if (!(user->adminflags & (ADMINFLAG_MUTED | ADMINFLAG_SELFMUTED)) && !(confflags & CONFFLAG_MONITOR) && !(ztc.confmode & ZT_CONF_TALKER)) {
 				ztc.confmode |= ZT_CONF_TALKER;
 				if (ioctl(fd, ZT_SETCONF, &ztc)) {
 					ast_log(LOG_WARNING, "Error setting conference - Un/Mute \n");
 					ret = -1;
 					break;
 				}
+
+				manager_event(EVENT_FLAG_CALL, "MeetmeUnmute", 
+						"Channel: %s\r\n"
+						"Uniqueid: %s\r\n"
+						"Meetme: %s\r\n"
+						"Usernum: %i\r\n",
+						chan->name, chan->uniqueid, conf->confno, user->user_no);
+			}
+
+			/* If I have been kicked, exit the conference */
+			if (user->adminflags & ADMINFLAG_KICKME) {
+				//You have been kicked.
+				if (!ast_streamfile(chan, "conf-kicked", chan->language))
+					ast_waitstream(chan, "");
+				ret = 0;
+				break;
 			}
 
 			if (c) {
@@ -1281,7 +1313,7 @@ static int conf_run(struct ast_channel *chan, struct ast_conference *conf, int c
 					if (user->talk.actual)
 						ast_frame_adjust_volume(f, user->talk.actual);
 
-					if (confflags &  CONFFLAG_MONITORTALKER) {
+					if (confflags & (CONFFLAG_MONITORTALKER | CONFFLAG_OPTIMIZETALKER)) {
 						int totalsilence;
 
 						if (user->talking == -1)
@@ -1320,7 +1352,8 @@ static int conf_run(struct ast_channel *chan, struct ast_conference *conf, int c
 						   don't want to block, but we do want to at least *try*
 						   to write out all the samples.
 						 */
-						careful_write(fd, f->data, f->datalen, 0);
+						if (user->talking || !(confflags & CONFFLAG_OPTIMIZETALKER))
+							careful_write(fd, f->data, f->datalen, 0);
 					}
 				} else if ((f->frametype == AST_FRAME_DTMF) && (confflags & CONFFLAG_EXIT_CONTEXT)) {
 					char tmp[2];
@@ -1367,22 +1400,14 @@ static int conf_run(struct ast_channel *chan, struct ast_conference *conf, int c
 							switch(dtmf) {
 							case '1': /* Un/Mute */
 								menu_active = 0;
-								if (ztc.confmode & ZT_CONF_TALKER) {
-	 						       		ztc.confmode = ZT_CONF_CONF | ZT_CONF_LISTENER;
-	 						       		confflags |= CONFFLAG_MONITOR ^ CONFFLAG_TALKER;
-								} else {
-									ztc.confmode = ZT_CONF_CONF | ZT_CONF_TALKER | ZT_CONF_LISTENER;
-									confflags ^= CONFFLAG_MONITOR | CONFFLAG_TALKER;
-								}
-								if (ioctl(fd, ZT_SETCONF, &ztc)) {
-									ast_log(LOG_WARNING, "Error setting conference - Un/Mute \n");
-									ret = -1;
-									break;
-								}
-								if (ztc.confmode & ZT_CONF_TALKER) {
+
+								/* for admin, change both admin and use flags */
+								if (user->adminflags & (ADMINFLAG_MUTED | ADMINFLAG_SELFMUTED)) {
+									user->adminflags &= ~(ADMINFLAG_MUTED | ADMINFLAG_SELFMUTED);
 									if (!ast_streamfile(chan, "conf-unmuted", chan->language))
 										ast_waitstream(chan, "");
 								} else {
+									user->adminflags |= (ADMINFLAG_MUTED | ADMINFLAG_SELFMUTED);
 									if (!ast_streamfile(chan, "conf-muted", chan->language))
 										ast_waitstream(chan, "");
 								}
@@ -1424,6 +1449,20 @@ static int conf_run(struct ast_channel *chan, struct ast_conference *conf, int c
 							case '9':
 								tweak_talk_volume(user, VOL_UP);
 								break;
+							case '*': /* alert to sysop */
+								menu_active = 0;
+
+								manager_event(EVENT_FLAG_CALL, "MeetmeAlert", 
+										"Channel: %s\r\n"
+										"Uniqueid: %s\r\n"
+										"Meetme: %s\r\n"
+										"Usernum: %i\r\n",
+										chan->name, chan->uniqueid, conf->confno, user->user_no);
+
+								/* acknowledge the user's request */
+								if (!ast_streamfile(chan, "conf-sysopreq", chan->language))
+									ast_waitstream(chan, "");
+								break;
 							default:
 								menu_active = 0;
 								/* Play an error message! */
@@ -1447,23 +1486,16 @@ static int conf_run(struct ast_channel *chan, struct ast_conference *conf, int c
 							switch(dtmf) {
 							case '1': /* Un/Mute */
 								menu_active = 0;
-								if (ztc.confmode & ZT_CONF_TALKER) {
-	 						       		ztc.confmode = ZT_CONF_CONF | ZT_CONF_LISTENER;
-	 						       		confflags |= CONFFLAG_MONITOR ^ CONFFLAG_TALKER;
-								} else if (!(user->adminflags & ADMINFLAG_MUTED)) {
-									ztc.confmode = ZT_CONF_CONF | ZT_CONF_TALKER | ZT_CONF_LISTENER;
-									confflags ^= CONFFLAG_MONITOR | CONFFLAG_TALKER;
-								}
-								if (ioctl(fd, ZT_SETCONF, &ztc)) {
-									ast_log(LOG_WARNING, "Error setting conference - Un/Mute \n");
-									ret = -1;
-									break;
-								}
-								if (ztc.confmode & ZT_CONF_TALKER) {
-									if (!ast_streamfile(chan, "conf-unmuted", chan->language))
+
+								/* user can only toggle the self-muted state */
+								user->adminflags ^= ADMINFLAG_SELFMUTED;
+
+								/* they can't override the admin mute state */
+								if (user->adminflags & (ADMINFLAG_MUTED | ADMINFLAG_SELFMUTED)) {
+									if (!ast_streamfile(chan, "conf-muted", chan->language))
 										ast_waitstream(chan, "");
 								} else {
-									if (!ast_streamfile(chan, "conf-muted", chan->language))
+									if (!ast_streamfile(chan, "conf-unmuted", chan->language))
 										ast_waitstream(chan, "");
 								}
 								break;
@@ -1481,6 +1513,20 @@ static int conf_run(struct ast_channel *chan, struct ast_conference *conf, int c
 								break;
 							case '9':
 								tweak_talk_volume(user, VOL_UP);
+								break;
+							case '*': /* alert to sysop */
+								menu_active = 0;
+
+								manager_event(EVENT_FLAG_CALL, "MeetmeAlert", 
+										"Channel: %s\r\n"
+										"Uniqueid: %s\r\n"
+										"Meetme: %s\r\n"
+										"Usernum: %i\r\n",
+										chan->name, chan->uniqueid, conf->confno, user->user_no);
+
+								/* acknowledge the user's request */
+								if (!ast_streamfile(chan, "conf-sysopreq", chan->language))
+									ast_waitstream(chan, "");
 								break;
 							default:
 								menu_active = 0;
@@ -1566,7 +1612,7 @@ static int conf_run(struct ast_channel *chan, struct ast_conference *conf, int c
  outrun:
 	ast_mutex_lock(&conflock);
 
-	if (confflags & CONFFLAG_MONITORTALKER && dsp)
+	if (dsp)
 		ast_dsp_free(dsp);
 	
 	if (user->user_no) { /* Only cleanup users who really joined! */
@@ -2143,6 +2189,76 @@ static int admin_exec(struct ast_channel *chan, void *data) {
 	return 0;
 }
 
+static int meetmemute(struct mansession *s, struct message *m, int mute)
+{
+	struct ast_conference *conf;
+	struct ast_conf_user *user;
+	char *confid = astman_get_header(m, "Meetme");
+	char *userid = astman_get_header(m, "Usernum");
+	int userno;
+
+	if (!confid || ast_strlen_zero(confid)) {
+		astman_send_error(s, m, "Meetme conference not specified");
+		return 0;
+	}
+
+	if (!userid || ast_strlen_zero(userid)) {
+		astman_send_error(s, m, "Meetme user number not specified");
+		return 0;
+	}
+
+	userno = strtoul(userid, &userid, 10);
+
+	if (*userid) {
+		astman_send_error(s, m, "Invalid user number");
+		return 0;
+	}
+
+	/* Look in the conference list */
+	ast_mutex_lock(&conflock);
+	for (conf = confs; conf; conf = conf->next)
+		if (!strcmp(confid, conf->confno))
+			break;
+
+	if (!conf) {
+		ast_mutex_unlock(&conflock);
+		astman_send_error(s, m, "Meetme conference does not exist");
+		return 0;
+	}
+
+	for (user = conf->firstuser; user; user = user->nextuser)
+		if (user->user_no == userno)
+			break;
+
+	if (!user) {
+		ast_mutex_unlock(&conflock);
+		astman_send_error(s, m, "User number not found");
+		return 0;
+	}
+
+	if (mute)
+		user->adminflags |= ADMINFLAG_MUTED;	/* request user muting */
+	else
+		user->adminflags &= ~ADMINFLAG_MUTED;	/* request user unmuting */
+
+	ast_mutex_unlock(&conflock);
+
+	ast_log(LOG_NOTICE, "Requested to %smute conf %s user %d userchan %s uniqueid %s\n", mute ? "" : "un", conf->confno, user->user_no, user->chan->name, user->chan->uniqueid);
+
+	astman_send_ack(s, m, mute ? "User muted" : "User unmuted");
+	return 0;
+}
+
+static int action_meetmemute(struct mansession *s, struct message *m)
+{
+	return meetmemute(s, m, 1);
+}
+
+static int action_meetmeunmute(struct mansession *s, struct message *m)
+{
+	return meetmemute(s, m, 0);
+}
+
 static void *recordthread(void *args)
 {
 	struct ast_conference *cnf = args;
@@ -2216,6 +2332,8 @@ int unload_module(void)
 	
 	res = ast_cli_unregister(&cli_show_confs);
 	res |= ast_cli_unregister(&cli_conf);
+	res |= ast_manager_unregister("MeetmeMute");
+	res |= ast_manager_unregister("MeetmeUnmute");
 	res |= ast_unregister_application(app3);
 	res |= ast_unregister_application(app2);
 	res |= ast_unregister_application(app);
@@ -2233,6 +2351,8 @@ int load_module(void)
 
 	res = ast_cli_register(&cli_show_confs);
 	res |= ast_cli_register(&cli_conf);
+	res |= ast_manager_register("MeetmeMute", EVENT_FLAG_CALL, action_meetmemute, "Mute a Meetme user");
+	res |= ast_manager_register("MeetmeUnmute", EVENT_FLAG_CALL, action_meetmeunmute, "Unmute a Meetme user");
 	res |= ast_register_application(app3, admin_exec, synopsis3, descrip3);
 	res |= ast_register_application(app2, count_exec, synopsis2, descrip2);
 	res |= ast_register_application(app, conf_exec, synopsis, descrip);
