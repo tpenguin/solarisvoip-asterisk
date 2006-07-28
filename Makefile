@@ -322,19 +322,6 @@ else
   RPMVERSION=unknown
 endif
 
-# CVS mirrors of SVN have .svnrevision files showing
-# which SVN revision they are based on, and .svnbranch
-# showing the branch they are made from
-ifneq ($(wildcard .svnrevision),)
-  ASTERISKVERSIONNUM=999999
-  ASTERISKVERSION:=SVN-$(shell cat .svnbranch)-r$(shell cat .svnrevision)
-else
-  ifneq ($(wildcard .svn),)
-    ASTERISKVERSIONNUM=999999
-    ASTERISKVERSION=SVN-$(shell build_tools/make_svn_branch_name)
-  endif
-endif
-
 ASTCFLAGS+= $(DEBUG_THREADS)
 ASTCFLAGS+= $(TRACE_FRAMES)
 ASTCFLAGS+= $(MALLOC_DEBUG)
