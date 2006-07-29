@@ -1,0 +1,9 @@
+[global]
+dbhost=localhost
+dbuser=username
+dbpass=password
+dbname=agilevoice
+dbprefix=ab_
+dbtable=ab_voip_fax
+timeout=5
+email_from=AgileVoice <fax@agilevoice.com>

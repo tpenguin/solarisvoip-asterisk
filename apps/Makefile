@@ -50,6 +50,10 @@ ifneq ($(wildcard $(CROSS_COMPILE_TARGET)/usr/include/linux/zaptel.h)$(wildcard 
 endif
 endif # WITHOUT_ZAPTEL
 
+ifneq ($(wildcard $(CROSS_COMPILE_TARGET)/usr/local/include/spandsp.h $(CROSS_COMPILE_TARGET)/usr/include/spandsp.h $(CROSS_COMPILE_TARGET)/opt/include/spandsp.h),)
+APPS+=app_rxfax.so app_txfax.so
+endif
+
 ifneq ($(wildcard $(CROSS_COMPILE_TARGET)/usr/local/include/osp/osp.h $(CROSS_COMPILE_TARGET)/usr/include/osp/osp.h),)
 APPS+=app_osplookup.so
 endif
