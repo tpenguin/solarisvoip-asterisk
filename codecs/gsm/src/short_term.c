@@ -373,7 +373,6 @@ void Gsm_Short_Term_Analysis_Filter P3((S,LARc,s),
 	word		* LARpp_j_1	= S->LARpp[ S->j ^= 1 ];
 
 	word		LARp[8];
-int i;
 #undef	FILTER
 #if 	defined(FAST) && defined(USE_FLOAT_MUL)
 # 	define	FILTER 	(* (S->fast			\
