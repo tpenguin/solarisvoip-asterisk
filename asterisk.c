@@ -160,6 +160,7 @@ int option_remote=0;			/*!< Remote CLI */
 int option_exec=0;			/*!< */
 int option_initcrypto=0;		/*!< Initialize crypto keys for RSA auth */
 int option_nocolor;			/*!< Don't use termcap colors */
+int option_max_open_files = 0;		/*< Set maximum number of open files */
 int option_dumpcore = 0;			/*!< Dump core when failing */
 int option_cache_record_files = 0;		/*!< Cache sound files */
 int option_timestamp = 0;			/*!< Timestamp in logging */
@@ -1969,6 +1970,11 @@ static void ast_readconfig(void) {
 		/* Disable some usage warnings for picky people :p */
 		} else if (!strcasecmp(v->name, "dontwarn")) {
 			option_dontwarn = ast_true(v->value);
+		/* Set maximum number of open files */
+		} else if (!strcasecmp(v->name, "max_open_files")) {
+			if ((sscanf(v->value, "%d", &option_max_open_files) != 1) || (option_max_open_files <= 0)) {
+				option_max_open_files = 0;
+			}
 		/* Dump core in case of crash (-g) */
 		} else if (!strcasecmp(v->name, "dumpcore")) {
 			option_dumpcore = ast_true(v->value);
@@ -2165,6 +2171,18 @@ int main(int argc, char *argv[])
 		}
 	}
 
+	if (option_max_open_files) {
+		struct rlimit l;
+		memset(&l, 0, sizeof(l));
+		l.rlim_cur = option_max_open_files;
+		l.rlim_max = option_max_open_files;
+		if (setrlimit(RLIMIT_NOFILE, &l)) {
+			ast_log(LOG_WARNING, "Unable to set the maximum number of file descriptors: %s\n", strerror(errno));
+		} else {
+			ast_log(LOG_DEBUG, "Set the maximum number of file descriptors to %d\n", option_max_open_files);
+		}
+	}
+	
 	if ((!rungroup) && !ast_strlen_zero(ast_config_AST_RUN_GROUP))
 		rungroup = ast_config_AST_RUN_GROUP;
 	if ((!runuser) && !ast_strlen_zero(ast_config_AST_RUN_USER))
