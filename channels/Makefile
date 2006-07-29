@@ -70,7 +70,8 @@ ifneq (${OSARCH},Darwin)
 endif
 
 ifeq (${OSARCH},SunOS)
-  SOLINK+=-R/usr/sfw/lib -L/usr/sfw/lib -R/opt/lib -L/opt/lib -lrt
+  SOLINK+=-R/usr/sfw/lib -L/usr/sfw/lib -R/opt/lib -L../../zaptel-solaris -L../../zaptel-solaris/libpri -lrt
+  CFLAGS+=-I../../zaptel-solaris -I../../zaptel-solaris/libpri
 endif
 
 ifneq ($(wildcard $(CROSS_COMPILE_TARGET)/usr/include/linux/ixjuser.h)$(wildcard $(CROSS_COMPILE_TARGET)/usr/local/include/ixjuser.h),)
@@ -110,7 +111,7 @@ ifneq ($(wildcard alsa-monitor.h),)
 endif
 
 ifndef WITHOUT_ZAPTEL
-ifneq ($(wildcard $(CROSS_COMPILE_TARGET)/usr/include/linux/zaptel.h)$(wildcard $(CROSS_COMPILE_TARGET)/usr/local/include/zaptel.h)$(wildcard $(CROSS_COMPILE_TARGET)/usr/pkg/include/zaptel.h)$(wildcard $(CROSS_COMPILE_TARGET)/opt/include/zaptel.h),)
+ifneq ($(wildcard $(CROSS_COMPILE_TARGET)/usr/include/linux/zaptel.h)$(wildcard $(CROSS_COMPILE_TARGET)/usr/local/include/zaptel.h)$(wildcard $(CROSS_COMPILE_TARGET)/usr/pkg/include/zaptel.h)$(wildcard ../../zaptel-solaris/zaptel.h),)
   ifeq (${OSARCH},NetBSD)
     SOLINK+=-L$(CROSS_COMPILE_TARGET)/usr/pkg/lib
   endif

@@ -45,7 +45,7 @@ APPS=app_dial.so app_playback.so app_voicemail.so app_directory.so app_mp3.so\
 #APPS+=app_rpt.so
 
 ifndef WITHOUT_ZAPTEL
-ifneq ($(wildcard $(CROSS_COMPILE_TARGET)/usr/include/linux/zaptel.h)$(wildcard $(CROSS_COMPILE_TARGET)/usr/local/include/zaptel.h)$(wildcard $(CROSS_COMPILE_TARGET)/opt/include/zaptel.h),)
+ifneq ($(wildcard $(CROSS_COMPILE_TARGET)/usr/include/linux/zaptel.h)$(wildcard $(CROSS_COMPILE_TARGET)/usr/local/include/zaptel.h)$(wildcard ../../zaptel-solaris/zaptel.h),)
   APPS+=app_zapras.so app_meetme.so app_flash.so app_zapbarge.so app_zapscan.so app_page.so
 endif
 endif # WITHOUT_ZAPTEL
@@ -59,8 +59,8 @@ CFLAGS+=-I$(CROSS_COMPILE_TARGET)/usr/local/include -L$(CROSS_COMPILE_TARGET)/us
 endif
 
 ifeq ($(findstring SunOS,${OSARCH}),SunOS)
-CFLAGS+=-I/opt/csw/include -I/opt/include
-SOLINK+=-R/opt/csw/lib -L/opt/csw/lib -R/opt/lib -L/opt/lib
+CFLAGS+=-I/opt/csw/include -I../../zaptel-solaris
+SOLINK+=-R/opt/csw/lib -L/opt/csw/lib -R/opt/lib -L../../zaptel-solaris
 endif
 
 CURLLIBS=$(shell $(CROSS_COMPILE_BIN)curl-config --libs)

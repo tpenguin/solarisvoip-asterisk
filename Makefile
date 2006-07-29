@@ -306,8 +306,8 @@ endif
 
 ifndef WITHOUT_ZAPTEL
 
-ifneq ($(wildcard $(CROSS_COMPILE_TARGET)/usr/include/linux/zaptel.h)$(wildcard $(CROSS_COMPILE_TARGET)/usr/local/include/zaptel.h)$(wildcard $(CROSS_COMPILE_TARGET)/usr/pkg/include/zaptel.h)$(wildcard $(CROSS_COMPILE_TARGET)/opt/include/zaptel.h),)
-  ASTCFLAGS+=-I/opt/include -DZAPTEL_OPTIMIZATIONS
+ifneq ($(wildcard $(CROSS_COMPILE_TARGET)/usr/include/linux/zaptel.h)$(wildcard $(CROSS_COMPILE_TARGET)/usr/local/include/zaptel.h)$(wildcard $(CROSS_COMPILE_TARGET)/usr/pkg/include/zaptel.h)$(wildcard ../zaptel-solaris/zaptel.h),)
+  ASTCFLAGS+=-I../zaptel-solaris -DZAPTEL_OPTIMIZATIONS
 endif
 
 endif # WITHOUT_ZAPTEL
