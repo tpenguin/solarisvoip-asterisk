@@ -353,7 +353,7 @@ static int ast_filehelper(const char *filename, const char *filename2, const cha
 	int res=0, ret = 0;
 	char *ext=NULL, *exts, *fn, *nfn;
 	FILE *bfile;
-	struct ast_channel *chan = (struct ast_channel *)filename2;
+	struct ast_channel *chan = (struct ast_channel *)(void *)filename2;
 	
 	/* Start with negative response */
 	if (action == ACTION_EXISTS)

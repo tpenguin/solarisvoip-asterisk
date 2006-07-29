@@ -505,7 +505,7 @@ static void build_iv(unsigned char *iv)
 	/* XXX Would be nice to be more random XXX */
 	unsigned int *fluffy;
 	int x;
-	fluffy = (unsigned int *)(iv);
+	fluffy = (unsigned int *)(void *)(iv);
 	for (x=0;x<4;x++)
 		fluffy[x] = rand();
 }
@@ -710,7 +710,7 @@ static void *dundi_query_thread(void *data)
 		st->eids[0] ? dundi_eid_to_str(eid_str, sizeof(eid_str), st->eids[0]) :  "ourselves");
 	memset(&ied, 0, sizeof(ied));
 	memset(&dei, 0, sizeof(dei));
-	memset(&hmd, 0, sizeof(hmd));
+	memset((void *)&hmd, 0, sizeof(hmd));
 	if (!dundi_eid_cmp(&st->trans->us_eid, &st->reqeid)) {
 		/* Ooh, it's us! */
 		ast_log(LOG_DEBUG, "Neat, someone look for us!\n");
@@ -1006,7 +1006,7 @@ static int dundi_prop_precache(struct dundi_transaction *trans, struct dundi_ies
 		}
 		/* Append mappings */
 		x = 0;
-		st->maps = (struct dundi_mapping *)s;
+		st->maps = (struct dundi_mapping *)(void *)s;
 		cur = mappings;
 		while(cur) {
 			if (!strcasecmp(cur->dcontext, ccontext)) {
@@ -1098,7 +1098,7 @@ static int dundi_answer_query(struct dundi_transaction *trans, struct dundi_ies 
 		}
 		/* Append mappings */
 		x = 0;
-		st->maps = (struct dundi_mapping *)s;
+		st->maps = (struct dundi_mapping *)(void *)s;
 		cur = mappings;
 		while(cur) {
 			if (!strcasecmp(cur->dcontext, ccontext)) {

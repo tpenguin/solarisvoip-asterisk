@@ -46,6 +46,9 @@ void Gsm_Preprocess P3((S, s, so),
 
 	word		SO;
 
+#ifdef __GNUC__
+	ulongword	utmp;
+#endif
 	register int		k = 160;
 
 	while (k--) {

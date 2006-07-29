@@ -83,7 +83,7 @@ static struct ast_filestream *g723_open(FILE *f)
 			return NULL;
 		}
 		tmp->f = f;
-		tmp->fr = (struct ast_frame *)tmp->buf;
+		tmp->fr = (struct ast_frame *)(void *)tmp->buf;
 		tmp->fr->data = tmp->buf + sizeof(struct ast_frame);
 		tmp->fr->frametype = AST_FRAME_VOICE;
 		tmp->fr->subclass = AST_FORMAT_G723_1;

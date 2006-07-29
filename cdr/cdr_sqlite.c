@@ -37,6 +37,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <sqlite.h>
+#include <stdio.h>
 
 #include "asterisk.h"
 

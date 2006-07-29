@@ -141,7 +141,7 @@ static struct stringlink *arg_parse(char *args, const char *filename, int lineno
 		if (args[0] == '{') {
 			/* Strip mandatory '}' from end */
 			args[strlen(args) - 1] = '\0';
-			while ((cur = (struct stringlink *)__grab_token(args + 1, filename, lineno, 1))) {
+			while ((cur = (struct stringlink *)(void *)__grab_token(args + 1, filename, lineno, 1))) {
 				cur->next = NULL;
 				if (prev)
 					prev->next = cur;
@@ -152,7 +152,7 @@ static struct stringlink *arg_parse(char *args, const char *filename, int lineno
 		} else if (*args) {
 			root = malloc(sizeof(struct stringlink) + strlen(args) + 1);
 			if (root) {
-				strcpy(root->data, args);
+				strcpy((void *)root->data, args);
 				root->next = NULL;
 			}
 		}

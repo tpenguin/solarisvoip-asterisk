@@ -1738,7 +1738,7 @@ static struct sip_peer *realtime_peer(const char *peername, struct sockaddr_in *
 static int sip_addrcmp(char *name, struct sockaddr_in *sin)
 {
 	/* We know name is the first field, so we can cast */
-	struct sip_peer *p = (struct sip_peer *)name;
+	struct sip_peer *p = (struct sip_peer *)(void *)name;
 	return 	!(!inaddrcmp(&p->addr, sin) || 
 					(ast_test_flag(p, SIP_INSECURE_PORT) &&
 					(p->addr.sin_addr.s_addr == sin->sin_addr.s_addr)));

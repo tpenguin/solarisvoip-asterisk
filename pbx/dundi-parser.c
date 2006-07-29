@@ -710,28 +710,28 @@ int dundi_parse_ies(struct dundi_ies *ies, unsigned char *data, int datalen)
 				snprintf(tmp, (int)sizeof(tmp), "Expecting ttl to be %d bytes long but was %d\n", (int)sizeof(unsigned short), len);
 				errorf(tmp);
 			} else
-				ies->ttl = ntohs(*((unsigned short *)(data + 2)));
+				ies->ttl = ntohs(*((unsigned short *)(void *)(data + 2)));
 			break;
 		case DUNDI_IE_VERSION:
 			if (len != (int)sizeof(unsigned short)) {
 				snprintf(tmp, (int)sizeof(tmp),  "Expecting version to be %d bytes long but was %d\n", (int)sizeof(unsigned short), len);
 				errorf(tmp);
 			} else
-				ies->version = ntohs(*((unsigned short *)(data + 2)));
+				ies->version = ntohs(*((unsigned short *)(void *)(data + 2)));
 			break;
 		case DUNDI_IE_EXPIRATION:
 			if (len != (int)sizeof(unsigned short)) {
 				snprintf(tmp, (int)sizeof(tmp),  "Expecting expiration to be %d bytes long but was %d\n", (int)sizeof(unsigned short), len);
 				errorf(tmp);
 			} else
-				ies->expiration = ntohs(*((unsigned short *)(data + 2)));
+				ies->expiration = ntohs(*((unsigned short *)(void *)(data + 2)));
 			break;
 		case DUNDI_IE_KEYCRC32:
 			if (len != (int)sizeof(unsigned int)) {
 				snprintf(tmp, (int)sizeof(tmp),  "Expecting expiration to be %d bytes long but was %d\n", (int)sizeof(unsigned int), len);
 				errorf(tmp);
 			} else
-				ies->keycrc32 = ntohl(*((unsigned int *)(data + 2)));
+				ies->keycrc32 = ntohl(*((unsigned int *)(void *)(data + 2)));
 			break;
 		case DUNDI_IE_UNKNOWN:
 			if (len == 1)

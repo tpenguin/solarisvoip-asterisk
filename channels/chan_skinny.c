@@ -2879,11 +2879,11 @@ static int get_input(struct skinnysession *s)
 			ast_log(LOG_WARNING, "Skinny Client sent less data than expected.\n");
 			return -1;
 		}
-		dlen = letohl(*(int *)s->inbuf);
+		dlen = letohl(*(int *)(void *)s->inbuf);
 		if (dlen+8 > sizeof(s->inbuf)) {
 			dlen = sizeof(s->inbuf) - 8;
 		}
-		*(int *)s->inbuf = htolel(dlen);
+		*(int *)(void *)s->inbuf = htolel(dlen);
 		res = read(s->fd, s->inbuf+4, dlen+4);
 		ast_mutex_unlock(&s->lock);
 		if (res != (dlen+4)) {
@@ -2905,7 +2905,7 @@ static skinny_req *skinny_req_parse(struct skinnysession *s)
 	}
 	memset(req, 0, sizeof(skinny_req));
 	/* +8 to account for reserved and length fields */
-	memcpy(req, s->inbuf, letohl(*(int*)(s->inbuf))+8); 
+	memcpy(req, s->inbuf, letohl(*(int*)(void *)(s->inbuf))+8); 
 	if (letohl(req->e) < 0) {
 		ast_log(LOG_ERROR, "Event Message is NULL from socket %d, This is bad\n", s->fd);
 		free(req);

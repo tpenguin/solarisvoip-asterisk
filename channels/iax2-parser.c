@@ -696,7 +696,7 @@ int iax_parse_ies(struct iax_ies *ies, unsigned char *data, int datalen)
 			ies->rsa_result = (char *)data + 2;
 			break;
 		case IAX_IE_APPARENT_ADDR:
-			ies->apparent_addr = ((struct sockaddr_in *)(data + 2));
+			ies->apparent_addr = ((struct sockaddr_in *)(void *)(data + 2));
 			break;
 		case IAX_IE_REFRESH:
 			if (len != (int)sizeof(unsigned short)) {

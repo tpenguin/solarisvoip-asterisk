@@ -5939,7 +5939,7 @@ static int send_trunk(struct iax2_trunk_peer *tpeer, struct timeval *now)
 	int calls = 0;
 	
 	/* Point to frame */
-	fr = (struct iax_frame *)tpeer->trunkdata;
+	fr = (struct iax_frame *)(void *)tpeer->trunkdata;
 	/* Point to meta data */
 	meta = (struct ast_iax2_meta_hdr *)fr->afdata;
 	mth = (struct ast_iax2_meta_trunk_hdr *)meta->data;

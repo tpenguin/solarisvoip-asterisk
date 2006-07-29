@@ -225,7 +225,7 @@ static struct ast_frame *process_cisco_dtmf(struct ast_rtp *rtp, unsigned char *
 	unsigned int event;
 	char resp = 0;
 	struct ast_frame *f = NULL;
-	event = ntohl(*((unsigned int *)(data)));
+	event = ntohl(*((unsigned int *)(void *)(data)));
 	event &= 0x001F;
 #if 0
 	printf("Cisco Digit: %08x (len = %d)\n", event, len);
@@ -267,12 +267,12 @@ static struct ast_frame *process_rfc2833(struct ast_rtp *rtp, unsigned char *dat
 	unsigned int duration;
 	char resp = 0;
 	struct ast_frame *f = NULL;
-	event = ntohl(*((unsigned int *)(data)));
+	event = ntohl(*((unsigned int *)(void *)(data)));
 	event >>= 24;
-	event_end = ntohl(*((unsigned int *)(data)));
+	event_end = ntohl(*((unsigned int *)(void *)(data)));
 	event_end <<= 8;
 	event_end >>= 24;
-	duration = ntohl(*((unsigned int *)(data)));
+	duration = ntohl(*((unsigned int *)(void *)(data)));
 	duration &= 0xFFFF;
 	if (rtpdebug)
 		ast_log(LOG_DEBUG, "- RTP 2833 Event: %08x (len = %d)\n", event, len);
@@ -448,7 +448,7 @@ struct ast_frame *ast_rtp_read(struct ast_rtp *rtp)
 					0, (struct sockaddr *)&sin, &len);
 
 
-	rtpheader = (unsigned int *)(rtp->rawdata + AST_FRIENDLY_OFFSET);
+	rtpheader = (unsigned int *)(void *)(rtp->rawdata + AST_FRIENDLY_OFFSET);
 	if (res < 0) {
 		if (errno != EAGAIN)
 			ast_log(LOG_WARNING, "RTP Read error: %s\n", strerror(errno));
@@ -524,12 +524,12 @@ struct ast_frame *ast_rtp_read(struct ast_rtp *rtp)
 				unsigned int event_end;
 				unsigned int duration;
 				data = rtp->rawdata + AST_FRIENDLY_OFFSET + hdrlen;
-				event = ntohl(*((unsigned int *)(data)));
+				event = ntohl(*((unsigned int *)(void *)(data)));
 				event >>= 24;
-				event_end = ntohl(*((unsigned int *)(data)));
+				event_end = ntohl(*((unsigned int *)(void *)(data)));
 				event_end <<= 8;
 				event_end >>= 24;
-				duration = ntohl(*((unsigned int *)(data)));
+				duration = ntohl(*((unsigned int *)(void *)(data)));
 				duration &= 0xFFFF;
 				ast_verbose("Got rfc2833 RTP packet from %s:%d (type %d, seq %d, ts %d, len %d, mark %d, event %08x, end %d, duration %d) \n", ast_inet_ntoa(iabuf, sizeof(iabuf), sin.sin_addr), ntohs(sin.sin_port), payloadtype, seqno, timestamp, res - hdrlen, (mark?1:0), event, ((event_end & 0x80)?1:0), duration);
 			}
@@ -1138,7 +1138,7 @@ int ast_rtp_senddigit(struct ast_rtp *rtp, char digit)
 	rtp->dtmfmute = ast_tvadd(ast_tvnow(), ast_tv(0, 500000));
 	
 	/* Get a pointer to the header */
-	rtpheader = (unsigned int *)data;
+	rtpheader = (unsigned int *)(void *)data;
 	rtpheader[0] = htonl((2 << 30) | (1 << 23) | (payload << 16) | (rtp->seqno));
 	rtpheader[1] = htonl(rtp->lastdigitts);
 	rtpheader[2] = htonl(rtp->ssrc); 
@@ -1205,7 +1205,7 @@ int ast_rtp_sendcng(struct ast_rtp *rtp, int level)
 	rtp->dtmfmute = ast_tvadd(ast_tvnow(), ast_tv(0, 500000));
 
 	/* Get a pointer to the header */
-	rtpheader = (unsigned int *)data;
+	rtpheader = (unsigned int *)(void *)data;
 	rtpheader[0] = htonl((2 << 30) | (1 << 23) | (payload << 16) | (rtp->seqno++));
 	rtpheader[1] = htonl(rtp->lastts);
 	rtpheader[2] = htonl(rtp->ssrc); 
