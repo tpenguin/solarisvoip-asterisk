@@ -130,7 +130,10 @@ static real c_b2 = 1.f;
 /*  E0AP   - Energy of all-pass speech (SS) */
 
 /* This subroutine has no local state. */
-
+int vparms_(integer *vwin, real *inbuf, real *lpbuf, integer
+        *buflim, integer *half, real *dither, integer *mintau, integer *zc,
+        integer *lbe, integer *fbe, real *qs, real *rc1, real *ar_b__, real *
+        ar_f__);
 /* Subroutine */ int vparms_(integer *vwin, real *inbuf, real *lpbuf, integer 
 	*buflim, integer *half, real *dither, integer *mintau, integer *zc, 
 	integer *lbe, integer *fbe, real *qs, real *rc1, real *ar_b__, real *

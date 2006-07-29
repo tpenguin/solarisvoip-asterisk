@@ -112,7 +112,9 @@ extern int placea_(integer *ipitch, integer *voibuf, integer *obound, integer *a
 /*           the analysis window. */
 
 /* This subroutine has no local state. */
-
+int placea_(integer *ipitch, integer *voibuf, integer *
+        obound, integer *af, integer *vwin, integer *awin, integer *ewin,
+        integer *lframe, integer *maxwin);
 /* Subroutine */ int placea_(integer *ipitch, integer *voibuf, integer *
 	obound, integer *af, integer *vwin, integer *awin, integer *ewin, 
 	integer *lframe, integer *maxwin)

@@ -79,7 +79,8 @@ extern int lpfilt_(real *inbuf, real *lpbuf, integer *len, integer *nsamp);
 /*           Indices len+1-nsamp through len are written. */
 
 /* This subroutine has no local state. */
-
+int lpfilt_(real *inbuf, real *lpbuf, integer *len, integer *
+        nsamp);
 /* Subroutine */ int lpfilt_(real *inbuf, real *lpbuf, integer *len, integer *
 	nsamp)
 {

@@ -76,6 +76,7 @@ extern int dcbias_(integer *len, real *speech, real *sigout);
 
 /* This subroutine has no local state. */
 
+int dcbias_(integer *len, real *speech, real *sigout);
 /* Subroutine */ int dcbias_(integer *len, real *speech, real *sigout)
 {
     /* System generated locals */

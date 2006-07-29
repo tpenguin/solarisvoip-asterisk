@@ -125,7 +125,9 @@ static real c_b2 = 1.f;
 /* This subroutine maintains local state from one call to the next.  If */
 /* you want to switch to using a new audio stream for this subroutine, or */
 /* reinitialize its state for any other reason, call the ENTRY INITONSET. */
-
+int onset_(real *pebuf, integer *osbuf, integer *
+        osptr, integer *oslen, integer *sbufl, integer *sbufh, integer *
+        lframe, struct lpc10_encoder_state *st);
 /* Subroutine */ int onset_(real *pebuf, integer *osbuf, integer *
 	osptr, integer *oslen, integer *sbufl, integer *sbufh, integer *
 	lframe, struct lpc10_encoder_state *st)

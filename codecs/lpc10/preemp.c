@@ -78,7 +78,8 @@ extern int preemp_(real *inbuf, real *pebuf, integer *nsamp, real *coef, real *z
 /*           Indices 1 through NSAMP are modified. */
 
 /* This subroutine has no local state. */
-
+int preemp_(real *inbuf, real *pebuf, integer *nsamp, real *
+        coef, real *z__);
 /* Subroutine */ int preemp_(real *inbuf, real *pebuf, integer *nsamp, real *
 	coef, real *z__)
 {

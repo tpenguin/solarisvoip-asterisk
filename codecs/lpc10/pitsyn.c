@@ -128,7 +128,10 @@ extern int pitsyn_(integer *order, integer *voice, integer *pitch, real *rms, re
 /*           guarantees when it calls this subroutine. */
 /*  RATIO  - Previous to present energy ratio */
 /*           Always assigned a value. */
-
+int pitsyn_(integer *order, integer *voice,
+        integer *pitch, real *rms, real *rc, integer *lframe, integer *ivuv,
+        integer *ipiti, real *rmsi, real *rci, integer *nout, real *ratio,
+                               struct lpc10_decoder_state *st);
 /* Subroutine */ int pitsyn_(integer *order, integer *voice, 
 	integer *pitch, real *rms, real *rc, integer *lframe, integer *ivuv, 
 	integer *ipiti, real *rmsi, real *rci, integer *nout, real *ratio,

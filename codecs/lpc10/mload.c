@@ -95,7 +95,8 @@ extern int mload_(integer *order, integer *awins, integer *awinf, real *speech, 
 /*                     and most are read after that. */
 
 /* This subroutine has no local state. */
-
+int mload_(integer *order, integer *awins, integer *awinf,
+        real *speech, real *phi, real *psi);
 /* Subroutine */ int mload_(integer *order, integer *awins, integer *awinf, 
 	real *speech, real *phi, real *psi)
 {

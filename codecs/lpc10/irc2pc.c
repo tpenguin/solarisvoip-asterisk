@@ -79,6 +79,8 @@ extern int irc2pc_(real *rc, real *pc, integer *order, real *gprime, real *g2pas
 
 /* This subroutine has no local state. */
 
+int irc2pc_(real *rc, real *pc, integer *order, real *gprime,
+         real *g2pass);
 /* Subroutine */ int irc2pc_(real *rc, real *pc, integer *order, real *gprime,
 	 real *g2pass)
 {

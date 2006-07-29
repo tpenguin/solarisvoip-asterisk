@@ -108,7 +108,9 @@ extern int placev_(integer *osbuf, integer *osptr, integer *oslen, integer *obou
 /* 		an onset bounds the right side of the voicing window. */
 
 /* This subroutine has no local state. */
-
+int placev_(integer *osbuf, integer *osptr, integer *oslen,
+        integer *obound, integer *vwin, integer *af, integer *lframe, integer
+        *minwin, integer *maxwin, integer *dvwinl, integer *dvwinh);
 /* Subroutine */ int placev_(integer *osbuf, integer *osptr, integer *oslen, 
 	integer *obound, integer *vwin, integer *af, integer *lframe, integer 
 	*minwin, integer *maxwin, integer *dvwinl, integer *dvwinh)

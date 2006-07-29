@@ -82,6 +82,7 @@ extern int ham84_(integer *input, integer *output, integer *errcnt);
 
 /* This subroutine has no local state. */
 
+int ham84_(integer *input, integer *output, integer *errcnt);
 /* Subroutine */ int ham84_(integer *input, integer *output, integer *errcnt)
 {
     /* Initialized data */

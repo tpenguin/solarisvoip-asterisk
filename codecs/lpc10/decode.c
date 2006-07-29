@@ -144,6 +144,11 @@ static integer c__2 = 2;
 /* reinitialize its state for any other reason, call the ENTRY */
 /* INITDECODE. */
 
+int decode_(integer *ipitv, integer *irms,
+        integer *irc, integer *voice, integer *pitch, real *rms, real *rc,
+                             struct lpc10_decoder_state *st);
+
+
 /* Subroutine */ int decode_(integer *ipitv, integer *irms, 
 	integer *irc, integer *voice, integer *pitch, real *rms, real *rc,
 			     struct lpc10_decoder_state *st)

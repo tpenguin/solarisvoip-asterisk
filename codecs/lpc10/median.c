@@ -65,7 +65,7 @@ extern integer median_(integer *d1, integer *d2, integer *d3);
 /*  D1,D2,D3 - Three input values */
 /* Output: */
 /*  MEDIAN - Median value */
-
+integer median_(integer *d1, integer *d2, integer *d3);
 integer median_(integer *d1, integer *d2, integer *d3)
 {
     /* System generated locals */

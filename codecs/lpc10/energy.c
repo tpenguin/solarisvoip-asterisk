@@ -75,6 +75,7 @@ extern int energy_(integer *len, real *speech, real *rms);
 
 /* This subroutine has no local state. */
 
+int energy_(integer *len, real *speech, real *rms);
 /* Subroutine */ int energy_(integer *len, real *speech, real *rms)
 {
     /* System generated locals */

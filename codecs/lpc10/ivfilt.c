@@ -86,6 +86,8 @@ extern int ivfilt_(real *lpbuf, real *ivbuf, integer *len, integer *nsamp, real 
 
 /* This subroutine has no local state. */
 
+int ivfilt_(real *lpbuf, real *ivbuf, integer *len, integer *
+        nsamp, real *ivrc);
 /* Subroutine */ int ivfilt_(real *lpbuf, real *ivbuf, integer *len, integer *
 	nsamp, real *ivrc)
 {

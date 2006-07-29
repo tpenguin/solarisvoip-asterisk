@@ -90,6 +90,7 @@ extern int invert_(integer *order, real *phi, real *psi, real *rc);
 /*  NOTE: Temporary matrix V is not needed and may be replaced */
 /*    by PHI if the original PHI values do not need to be preserved. */
 
+int invert_(integer *order, real *phi, real *psi, real *rc);
 /* Subroutine */ int invert_(integer *order, real *phi, real *psi, real *rc)
 {
     /* System generated locals */

@@ -90,7 +90,9 @@ extern int tbdm_(real *speech, integer *lpita, integer *tau, integer *ltau, real
 /*  MINTAU - Lag corresponding to minimum AMDF value */
 
 /* This subroutine has no local state. */
-
+int tbdm_(real *speech, integer *lpita, integer *tau,
+        integer *ltau, real *amdf, integer *minptr, integer *maxptr, integer *
+        mintau);
 /* Subroutine */ int tbdm_(real *speech, integer *lpita, integer *tau, 
 	integer *ltau, real *amdf, integer *minptr, integer *maxptr, integer *
 	mintau)

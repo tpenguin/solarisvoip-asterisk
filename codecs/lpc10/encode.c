@@ -108,6 +108,9 @@ static integer c__2 = 2;
 
 /* This subroutine has no local state. */
 
+int encode_(integer *voice, integer *pitch, real *rms, real *
+        rc, integer *ipitch, integer *irms, integer *irc);
+
 /* Subroutine */ int encode_(integer *voice, integer *pitch, real *rms, real *
 	rc, integer *ipitch, integer *irms, integer *irc)
 {

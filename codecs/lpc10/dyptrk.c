@@ -126,6 +126,11 @@ extern struct {
 /* reinitialize its state for any other reason, call the ENTRY */
 /* INITDYPTRK. */
 
+int dyptrk_(real *amdf, integer *ltau, integer *
+        minptr, integer *voice, integer *pitch, integer *midx,
+                               struct lpc10_encoder_state *st);
+
+
 /* Subroutine */ int dyptrk_(real *amdf, integer *ltau, integer *
 	minptr, integer *voice, integer *pitch, integer *midx,
 			       struct lpc10_encoder_state *st)

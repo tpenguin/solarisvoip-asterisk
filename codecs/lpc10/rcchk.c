@@ -79,6 +79,7 @@ extern int rcchk_(integer *order, real *rc1f, real *rc2f);
 
 /* This subroutine has no local state. */
 
+int rcchk_(integer *order, real *rc1f, real *rc2f);
 /* Subroutine */ int rcchk_(integer *order, real *rc1f, real *rc2f)
 {
     /* System generated locals */

@@ -103,6 +103,8 @@ extern int deemp_(real *x, integer *n, struct lpc10_decoder_state *st);
 /* reinitialize its state for any other reason, call the ENTRY */
 /* INITDEEMP. */
 
+int deemp_(real *x, integer *n, struct lpc10_decoder_state *st);
+
 /* Subroutine */ int deemp_(real *x, integer *n, struct lpc10_decoder_state *st)
 {
     /* Initialized data */

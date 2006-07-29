@@ -89,7 +89,7 @@ extern integer random_(struct lpc10_decoder_state *st);
 /* In the context of the LPC10 coder, there is no reason to reinitialize */
 /* this local state when switching between audio streams, because its */
 /* results are only used to generate noise for unvoiced frames. */
-
+integer random_(struct lpc10_decoder_state *st);
 integer random_(struct lpc10_decoder_state *st)
 {
     /* Initialized data */

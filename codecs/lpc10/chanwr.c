@@ -69,6 +69,13 @@ Some OSS fixes and a few lpc changes to make it actually work
 /* Revision 1.1  1996/02/07 14:43:31  jaf */
 /* Initial revision */
 
+int chanwr_0_(int n__, integer *order, integer *ipitv,
+        integer *irms, integer *irc, integer *ibits,
+                               struct lpc10_encoder_state *st);
+int chanwr_(integer *order, integer *ipitv, integer *irms,
+        integer *irc, integer *ibits, struct lpc10_encoder_state *st);
+int chanrd_(integer *order, integer *ipitv, integer *irms,
+        integer *irc, integer *ibits);
 
 /* *********************************************************************** */
 

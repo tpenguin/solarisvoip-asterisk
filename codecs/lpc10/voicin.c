@@ -254,7 +254,10 @@ s*/
 /* you want to switch to using a new audio stream for this filter, or */
 /* reinitialize its state for any other reason, call the ENTRY */
 /* INITVOICIN. */
-
+int voicin_(integer *vwin, real *inbuf, real *
+        lpbuf, integer *buflim, integer *half, real *minamd, real *maxamd,
+        integer *mintau, real *ivrc, integer *obound, integer *voibuf,
+        integer *af, struct lpc10_encoder_state *st);
 /* Subroutine */ int voicin_(integer *vwin, real *inbuf, real *
 	lpbuf, integer *buflim, integer *half, real *minamd, real *maxamd, 
 	integer *mintau, real *ivrc, integer *obound, integer *voibuf, 

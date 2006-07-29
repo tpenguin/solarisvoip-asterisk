@@ -110,6 +110,10 @@ extern int inithp100_(void);
 /* you want to switch to using a new audio stream for this filter, or */
 /* reinitialize its state for any other reason, call the ENTRY */
 /* INITHP100. */
+
+int hp100_(real *speech, integer *start, integer *end,
+        struct lpc10_encoder_state *st);
+
 /* Subroutine */ int hp100_(real *speech, integer *start, integer *end,
 	struct lpc10_encoder_state *st)
 {

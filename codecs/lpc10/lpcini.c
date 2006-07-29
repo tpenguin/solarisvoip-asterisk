@@ -90,6 +90,7 @@ struct {
 /* Initialize COMMON block variables used by LPC-10 encoder and decoder, */
 /* and call initialization routines for both of them. */
 
+int lpcini_(void);
 /* Subroutine */ int lpcini_(void)
 {
 

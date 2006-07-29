@@ -98,6 +98,9 @@ static integer c__1 = 1;
 /* stream for this filter, or reinitialize its state for any other */
 /* reason, call the ENTRY INITPREPRO. */
 
+int prepro_(real *speech, integer *length,
+                             struct lpc10_encoder_state *st);
+
 /* Subroutine */ int prepro_(real *speech, integer *length,
 			     struct lpc10_encoder_state *st)
 {

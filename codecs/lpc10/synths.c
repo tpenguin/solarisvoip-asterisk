@@ -49,6 +49,9 @@ extern int synths_(integer *voice, integer *pitch, real *rms, real *rc, real *sp
 /*:ref: initdeemp_ 14 0 */
 #endif
 
+extern int irc2pc_(real *rc, real *pc, integer *order, real *gprime, real *g2pass);
+extern int bsynz_(real *coef, integer *ip, integer *iv, real *sout, real *rms, real *ratio, real *g2pass, struct lpc10_decoder_state *st);
+
 /* Common Block Declarations */
 
 extern struct {
@@ -166,7 +169,8 @@ static real c_b2 = .7f;
 /*           Indices 1 through the final value of K are written. */
 /*  K      - Number of samples placed into array SPEECH. */
 /*           This is always MAXFRM. */
-
+int synths_(integer *voice, integer *pitch, real *
+        rms, real *rc, real *speech, integer *k, struct lpc10_decoder_state *st);
 /* Subroutine */ int synths_(integer *voice, integer *pitch, real *
 	rms, real *rc, real *speech, integer *k, struct lpc10_decoder_state *st)
 {
