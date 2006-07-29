@@ -60,6 +60,13 @@ extern int analys_(real *speech, integer *voice, integer *pitch, real *rms, real
 	-lf2c -lm   (in that order)
 */
 
+int placev_(integer *osbuf, integer *osptr, integer *oslen,
+        integer *obound, integer *vwin, integer *af, integer *lframe, integer
+        *minwin, integer *maxwin, integer *dvwinl, integer *dvwinh);
+int placea_(integer *ipitch, integer *voibuf, integer *
+        obound, integer *af, integer *vwin, integer *awin, integer *ewin,
+        integer *lframe, integer *maxwin);
+
 /* Common Block Declarations */
 
 extern struct {
@@ -202,6 +209,9 @@ static integer c__1 = 1;
 
 /* This entry has no local state.  It accesses a "constant" array */
 /* declared in ANALYS. */
+
+int analys_(real *speech, integer *voice, integer
+	*pitch, real *rms, real *rc, struct lpc10_encoder_state *st);
 
 /* Subroutine */ int analys_(real *speech, integer *voice, integer 
 	*pitch, real *rms, real *rc, struct lpc10_encoder_state *st)
