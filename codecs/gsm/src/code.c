@@ -62,7 +62,7 @@ void Gsm_Coder P8((S,s,LARc,Nc,bc,Mc,xmaxc,xMc),
 
 	word	so[160];
 
-#ifndef __sparc
+#if !defined(__sparc) && !defined(__amd64__)
 #if !(defined(__GNUC__) && defined(__i386__))
 	longword ltmp;
 #endif
