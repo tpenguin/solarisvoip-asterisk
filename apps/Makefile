@@ -63,8 +63,8 @@ CFLAGS+=-I$(CROSS_COMPILE_TARGET)/usr/local/include -L$(CROSS_COMPILE_TARGET)/us
 endif
 
 ifeq ($(findstring SunOS,${OSARCH}),SunOS)
-CFLAGS+=-I/opt/csw/include -I../../zaptel-solaris
-SOLINK+=-R/opt/csw/lib -L/opt/csw/lib -R/opt/lib -L../../zaptel-solaris
+CFLAGS+=-I/opt/csw/include -I/opt/include -I../../zaptel-solaris
+SOLINK+=-R/opt/csw/lib -L/opt/csw/lib -L/opt/include -R/opt/lib -L../../zaptel-solaris
 endif
 
 CURLLIBS=$(shell $(CROSS_COMPILE_BIN)curl-config --libs)
