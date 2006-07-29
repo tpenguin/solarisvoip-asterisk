@@ -46,8 +46,6 @@ void Gsm_Preprocess P3((S, s, so),
 
 	word		SO;
 
-	ulongword	utmp;		/* for L_ADD */
-
 	register int		k = 160;
 
 	while (k--) {
