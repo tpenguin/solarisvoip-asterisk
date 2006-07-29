@@ -124,7 +124,7 @@ static char txqcheck (char *dir, char *queue, char subaddress, char *channel, ch
       ql = p - queue;
       subaddress = p[1];
    }
-   snprintf (temp, sizeof(temp), "sms/.smsq-%d", getpid ());
+   snprintf (temp, sizeof(temp), "sms/.smsq-%d", (int)getpid ());
    f = fopen (temp, "w");
    if (!f)
    {
@@ -194,7 +194,7 @@ static void rxqcheck (char *dir, char *queue, char *process)
    DIR *d;
    int ql = strlen (queue);
    struct dirent *fn;
-   snprintf(temp, sizeof(temp), "sms/.smsq-%d", getpid ());
+   snprintf(temp, sizeof(temp), "sms/.smsq-%d", (int)getpid ());
    snprintf(dirname, sizeof(dirname), "sms/%s", dir);
    d = opendir (dirname);
    if (!d)
@@ -671,10 +671,10 @@ main (int argc, const char *argv[])
         queuename[100],
        *dir = (mo ? rx ? "sms/morx" : "sms/motx" : rx ? "sms/mtrx" : "sms/mttx");
       FILE *f;
-      snprintf (temp, sizeof(temp), "sms/.smsq-%d", getpid ());
+      snprintf (temp, sizeof(temp), "sms/.smsq-%d", (int)getpid ());
       mkdir ("sms", 0777);      /* ensure directory exists */
       mkdir (dir, 0777);        /* ensure directory exists */
-      snprintf (queuename, sizeof(queuename), "%s/%s.%ld-%d", dir, *queue ? queue : "0", (long)time (0), getpid ());
+      snprintf (queuename, sizeof(queuename), "%s/%s.%ld-%d", dir, *queue ? queue : "0", (long)time (0), (int)getpid ());
       f = fopen (temp, "w");
       if (!f)
       {

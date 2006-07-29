@@ -431,9 +431,17 @@ REV	= $(shell date +'%Y.%m.%d.%H.%M')
 ARCH	= $(shell pkgparam SUNWcsr ARCH)
 PKGARCHIVE = $(shell pwd)/$(shell uname -s)-$(shell uname -r).$(shell uname -m)
 
-pkg: all $(PKGARCHIVE) pkginfo
+pkg: all pkgdepend $(PKGARCHIVE) pkginfo
 	pkgmk -oa `uname -m` -d $(PKGARCHIVE) -f prototype
 	pkgtrans -s $(PKGARCHIVE) SVasterisk-`uname -m`-`uname -r`.pkg SVasterisk
+
+pkgdepend:
+	[ -f channels/chan_zap.so ] || ( echo "Package SVzaptel is required to build." && exit 1 )
+	[ -f apps/app_curl.so ] || ( echo "Package CSWcurl is required to build." && exit 1 )
+	[ -f apps/app_lookupcnam.so ] || ( echo "Package CSWcurl is required to build." && exit 1 )
+	[ -f apps/app_meetme.so ] || ( echo "Package SVzaptel is required to build." && exit 1 )
+	[ -f formats/format_ogg_vorbis.so ] || ( echo "Package CSWogg and CSWvorbis are required to build." && exit 1 )
+	[ -f utils/astman ] || ( echo "Package SVnewt is required to build." && exit 1 )
 
 $(PKGARCHIVE):
 	test -d $@ || mkdir -p $@
@@ -548,7 +556,7 @@ clean:
 	@if [ -d mpg123-0.59r ]; then $(MAKE) -C mpg123-0.59r clean; fi
 	$(MAKE) -C db1-ast clean
 	$(MAKE) -C stdtime clean
-	rm pkginfo
+	[ ! -f pkginfo ] || rm pkginfo
 
 datafiles: all
 	if [ x`$(ID) -un` = xroot ]; then sh mkpkgconfig $(DESTDIR)/usr/lib/pkgconfig; fi
