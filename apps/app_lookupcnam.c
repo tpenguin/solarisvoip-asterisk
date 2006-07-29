@@ -118,7 +118,7 @@ lookupcnam_internal(struct MemoryStruct *chunk, char *url, char *post)
 	return 0;
 }
 
-static int
+static char *
 lookupcnam_acf_exec (struct ast_channel *chan, char *cmd, char *data, char *buf, size_t len)
 {
 	struct localuser *u;
@@ -128,7 +128,7 @@ lookupcnam_acf_exec (struct ast_channel *chan, char *cmd, char *data, char *buf,
 	
 	if(ast_strlen_zero(data)) {
 		ast_log(LOG_WARNING, "LookupCNAM requires multiple arguments\n");
-		return -1;
+		return "";
 	}	
 	
 	LOCAL_USER_ACF_ADD(u);
@@ -137,7 +137,7 @@ lookupcnam_acf_exec (struct ast_channel *chan, char *cmd, char *data, char *buf,
 	if(!info) {
 		ast_log(LOG_ERROR, "Out of memory\n");
 		LOCAL_USER_REMOVE(u);
-		return -1;
+		return "";
 	}
 
 	username = strsep(&info, "|");
@@ -146,7 +146,7 @@ lookupcnam_acf_exec (struct ast_channel *chan, char *cmd, char *data, char *buf,
 	perform_lookupcnam(chan, username, password);
 
 	LOCAL_USER_REMOVE(u);
-	return 0;
+	return "";
 }
 
 static int
