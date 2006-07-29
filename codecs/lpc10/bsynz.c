@@ -119,6 +119,10 @@ extern struct {
 /* reinitialize its state for any other reason, call the ENTRY */
 /* INITBSYNZ. */
 
+int bsynz_(real *coef, integer *ip, integer *iv,
+        real *sout, real *rms, real *ratio, real *g2pass,
+                            struct lpc10_decoder_state *st);
+
 /* Subroutine */ int bsynz_(real *coef, integer *ip, integer *iv, 
 	real *sout, real *rms, real *ratio, real *g2pass,
 			    struct lpc10_decoder_state *st)
