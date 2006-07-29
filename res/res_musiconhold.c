@@ -431,7 +431,11 @@ static int spawn_mp3(struct mohclass *class)
 		sleep(respawn_time - (time(NULL) - class->start));
 	}
 	time(&class->start);
+#ifdef SOLARIS
 	class->pid = fork1();
+#else
+	class->pid = fork();
+#endif
 	if (class->pid < 0) {
 		close(fds[0]);
 		close(fds[1]);

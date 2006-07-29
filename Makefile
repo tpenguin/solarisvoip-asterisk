@@ -428,7 +428,11 @@ endif
 noclean: depend asterisk subdirs
 
 REV	= $(shell date +'%Y.%m.%d.%H.%M')
+ifneq ($(wildcard /usr/bin/pkgparam),)
 ARCH	= $(shell pkgparam SUNWcsr ARCH)
+else
+ARCH	= $(shell uname -p)
+endif
 PKGARCHIVE = $(shell pwd)/$(shell uname -s)-$(shell uname -r).$(shell uname -m)
 
 pkg: all pkgdepend $(PKGARCHIVE) pkginfo
