@@ -191,6 +191,12 @@ ifeq ($(OSARCH),Linux)
     OPTIONS+=-m64
   endif
 
+  ifeq ($(PROC),i686)
+    ifeq ($(shell uname -m),x86_64)
+      SOLINK=-m32
+    endif
+  endif
+
   ifeq ($(PROC),sparc64)
     #The problem with sparc is the best stuff is in newer versions of gcc (post 3.0) only.
     #This works for even old (2.96) versions of gcc and provides a small boost either way.
@@ -369,7 +375,7 @@ ifeq ($(OSARCH),Darwin)
 else
 #These are used for all but Darwin
   ASTLINK=-Wl,-E 
-  SOLINK=-shared -Xlinker -x
+  SOLINK+=-shared -Xlinker -x
 endif
 
 ifeq ($(OSARCH),FreeBSD)
@@ -402,7 +408,11 @@ else
   HAVEDOT=no
 endif
 
+ifneq ($(wildcard /usr/lib/libssl3.so),)
+LIBS+=-lssl3
+else
 LIBS+=-lssl
+endif
 
 INSTALL=install
 
@@ -541,7 +551,7 @@ asterisk: $(CYGLOADER) editline/libedit.a db1-ast/libdb1.a stdtime/libtime.a $(O
 	fi
 	rm -f include/asterisk/build.h.tmp
 	$(CC) -c -o buildinfo.o $(CFLAGS) buildinfo.c
-	$(CC) $(DEBUG) $(ASTOBJ) $(ASTLINK) $(OBJS) buildinfo.o $(LIBEDIT) db1-ast/libdb1.a stdtime/libtime.a $(LIBS)
+	$(CC) $(DEBUG) $(OPTIMIZE) $(ASTOBJ) $(ASTLINK) $(OBJS) buildinfo.o $(LIBEDIT) db1-ast/libdb1.a stdtime/libtime.a $(LIBS)
 
 muted: muted.o
 	$(CC) $(AUDIO_LIBS) -o muted muted.o

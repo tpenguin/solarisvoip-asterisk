@@ -222,12 +222,12 @@ editline.c : $(ACSRCS) $(BCSRCS) $(AGCSRCS)
 	$(SHELL) makelist -e $(ACSRCS) $(BCSRCS) $(AGCSRCS) > $@
 
 .c.o :
-	$(CC) -c $(A_CFLAGS) $(CFLAGS) $(CPPFLAGS) $< -o $@
+	$(CC) -c $(A_CFLAGS) $(OPTIMIZE) $(CFLAGS) $(CPPFLAGS) $< -o $@
 
 .c.o_a : $(AGHDRS) $(BGHDRS)
-	$(CC) -c $(A_CFLAGS) $(CFLAGS) $(CPPFLAGS) $< -o $@
+	$(CC) -c $(A_CFLAGS) $(OPTIMIZE) $(CFLAGS) $(CPPFLAGS) $< -o $@
 
 .c.o_s : $(AGHDRS) $(BGHDRS)
-	$(CC) -c $(S_CFLAGS) $(CFLAGS) $(CPPFLAGS) $< -o $@
+	$(CC) -c $(S_CFLAGS) $(OPTIMIZE) $(CFLAGS) $(CPPFLAGS) $< -o $@
 
 $(CCSRCS) : $(BGHDRS)

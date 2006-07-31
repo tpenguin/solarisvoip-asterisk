@@ -1,7 +1,13 @@
 #	@(#)Makefile	8.9 (Berkeley) 7/14/94
 
 LIBDB=	libdb1.a
+ifeq ($(PROC),)
 ARCH=$(shell uname -m)
+else
+ARCH=$(PROC)
+endif
+CFLAGS+=$(OPTIMIZE)
+
 ifeq ($(ARCH),alpha)
 SOVER=2.1
 else
@@ -46,7 +52,7 @@ clean:
 	rm -f $(LIBDB) $(LIBDBSO) $(OBJS) $(SHOBJS)
 
 OORG=	-O2
-CL=	$(CC) -Wall -c -D__DBINTERFACE_PRIVATE $(OORG) -I. -Iinclude
+CL=	$(CC) $(OPTIMIZE) -Wall -c -D__DBINTERFACE_PRIVATE $(OORG) -I. -Iinclude
 
 OSTYPE=$(shell uname -s)
 ifeq ($(OSTYPE),SunOS)
