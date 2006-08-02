@@ -67,18 +67,18 @@ CFLAGS+=-I/opt/csw/include -I/opt/include -I../../zaptel-solaris
 SOLINK+=-R/opt/csw/lib -L/opt/csw/lib -L/opt/include -R/opt/lib -L../../zaptel-solaris
 endif
 
-CURLLIBS=$(shell $(CROSS_COMPILE_BIN)curl-config --libs)
-ifneq ($(shell if [[ 0x`$(CROSS_COMPILE_BIN)curl-config --vernum` -ge 0x70907 ]]; then echo "OK" ; fi),)
-  ifneq (${CURLLIBS},)
-    APPS+=app_curl.so app_lookupcnam.so
-  endif 
-endif
-
 # On Sun, we will test for CSW curl
 ifeq ($(findstring SunOS,${OSARCH}),SunOS)
   CURLLIBS=$(shell /opt/csw/bin/curl-config --libs)
   ifneq (${CURLLIBS},)
     APPS+=app_curl.so app_lookupcnam.so
+  endif
+else
+  CURLLIBS=$(shell $(CROSS_COMPILE_BIN)curl-config --libs)
+  ifneq ($(shell if [ 0x`$(CROSS_COMPILE_BIN)curl-config --vernum` -ge 0x70907 ]; then echo "OK" ; fi),)
+    ifneq (${CURLLIBS},)
+      APPS+=app_curl.so app_lookupcnam.so
+    endif
   endif
 endif
 

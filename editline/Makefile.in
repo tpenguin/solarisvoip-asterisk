@@ -4,9 +4,9 @@
 
 OSTYPE=$(shell uname -s)
 define cyg_subst_sys
-	if uname -s | grep -qi cygwin; then \
+	if uname -s | grep -i cygwin; then \
 	cat $@ | sed -e s/"sys\.h"/"config.h"/g > $@.copy; \
-	mv --force $@.copy $@; \
+	mv -f $@.copy $@; \
 	fi
 endef
 
