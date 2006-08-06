@@ -45,7 +45,9 @@
 #endif
 #include <unistd.h>
 #include <sys/ioctl.h>
-
+#ifdef SOLARIS
+#include <thread.h>
+#endif
 #include "asterisk.h"
 
 ASTERISK_FILE_VERSION(__FILE__, "$Revision: 16534 $")
