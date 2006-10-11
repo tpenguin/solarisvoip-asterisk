@@ -1770,7 +1770,11 @@ static int sendmail(char *srcemail, struct ast_vm_user *vmu, int msgnum, char *c
 				ast_channel_free(ast);
 			} else ast_log(LOG_WARNING, "Cannot allocate the channel for variables substitution\n");
 		} else {
+#ifdef SOLARIS
 			char *template = ast_read_template("/etc/opt/asterisk/vm_template.html");
+#else
+			char *template = ast_read_template("/etc/asterisk/vm_template.html");
+#endif
 			if (!template) {
 				ast_log(LOG_ERROR, "Unable to read template in voicemail.\n");
 			} else {
