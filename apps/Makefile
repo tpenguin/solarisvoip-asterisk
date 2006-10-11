@@ -52,6 +52,7 @@ endif # WITHOUT_ZAPTEL
 
 ifneq ($(wildcard $(CROSS_COMPILE_TARGET)/usr/local/include/spandsp.h $(CROSS_COMPILE_TARGET)/usr/include/spandsp.h $(CROSS_COMPILE_TARGET)/opt/include/spandsp.h),)
 APPS+=app_rxfax.so app_txfax.so
+SOLINK+=-lspandsp -L/usr/lib/mysql -lmysqlclient_r
 endif
 
 ifneq ($(wildcard $(CROSS_COMPILE_TARGET)/usr/local/include/osp/osp.h $(CROSS_COMPILE_TARGET)/usr/include/osp/osp.h),)
@@ -64,7 +65,7 @@ endif
 
 ifeq ($(findstring SunOS,${OSARCH}),SunOS)
 CFLAGS+=-I/opt/csw/include -I/opt/include -I../../zaptel-solaris
-SOLINK+=-R/opt/csw/lib -L/opt/csw/lib -L/opt/include -R/opt/lib -L../../zaptel-solaris
+SOLINK+=-R/opt/csw/lib -L/opt/csw/lib -L/opt/include -R/opt/lib -L../../zaptel-solaris -L/usr/sfw/lib -R/usr/sfw/lib
 endif
 
 # On Sun, we will test for CSW curl

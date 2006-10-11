@@ -793,8 +793,11 @@ static int rxfax_exec(struct ast_channel *chan, void *data)
         ast_log(LOG_DEBUG, "Executing: %s\n", cmd);
         system(cmd);
         if (stat(pdf_file, &statBuf) == 0 && statBuf.st_size) {
+	    ast_log(LOG_DEBUG, "Sending PDF via email\n");	
             faxToMail(chan, pdf_file, "pdf", &fax);
+	    ast_log(LOG_DEBUG, "Storing PDF to database\n");
             faxToDatabase(chan, pdf_file, "pdf", &fax);
+	    ast_log(LOG_DEBUG, "Removing PDF from tmp directory.\n");
             if (unlink(pdf_file)) {
                 ast_log(LOG_WARNING, "Unable to unlink file '%s'\n", target_file);
             }

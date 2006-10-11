@@ -464,6 +464,15 @@ pkginfo:
 	sed -e 's/<version>/$(ASTERISKVERSIONNUM),REV=$(REV)/' pkginfo_src | \
 	sed -e 's/<arch>/$(ARCH)/' > $@ 
 
+rhelsrc:
+	test -d /tmp/sv-rpm-src/asterisk-1.2.7.1 || mkdir -p /tmp/sv-rpm-src/asterisk-1.2.7.1
+	cp -pr . /tmp/sv-rpm-src/asterisk-1.2.7.1
+	find /tmp/sv-rpm-src -name ".svn" -depth -exec rm -fr {} \;
+	echo "asterisk-1.2.7.1-solvoip-`svn info | grep Revision | awk '{ print $$2 }'`" >/tmp/sv-rpm-src/asterisk-1.2.7.1/.version
+	OWD=`pwd`
+	cd /tmp/sv-rpm-src && tar -czf /usr/src/redhat/SOURCES/asterisk-1.2.7.1.tar.gz asterisk-1.2.7.1
+	cd ${OWD}
+	
 editline/config.h:
 	cd editline && unset CFLAGS LIBS && ./configure ; \
 
