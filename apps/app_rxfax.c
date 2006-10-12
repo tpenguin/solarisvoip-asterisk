@@ -369,16 +369,19 @@ char *getFaxUserEmail (char* faxExten) {
                 while(*faxemail && *faxemail < 33)
                     faxemail++;
             }
+		if (user && faxemail && *user && *faxemail) {
+			ast_log(LOG_DEBUG, "Read user=%s email=%s\n", user, faxemail);
+		}
             if (user && faxemail && *user && *faxemail && !strcmp(user, faxExten)) {
                 /* Return Email */
                 fclose(configin);
-				ast_mutex_unlock(&email_addr_lock);
+		ast_mutex_unlock(&email_addr_lock);
                 return faxemail;
             } 
         }
     }
     fclose(configin);
-	ast_mutex_unlock(&email_addr_lock);
+    ast_mutex_unlock(&email_addr_lock);
     return NULL;
 }
 
@@ -496,6 +499,7 @@ fax_cleanup:
 static int faxToMail (struct ast_channel *fxchan, char* attach, char* attachType, t30_state_t *s)
 {
 	FILE *p;
+	int pfd;
 	char *fxemail;
 	char bound[256];
 	t30_stats_t tstats;
@@ -507,6 +511,8 @@ static int faxToMail (struct ast_channel *fxchan, char* attach, char* attachType
 	int len;
 	char *outbuffer = NULL;
 	char template_name[AST_CONFIG_MAX_PATH];
+	char tmp[80] = "/tmp/astmail-XXXXXX";
+	char tmp2[256];
 
 	/* Gather the structures containing the stats about the fax */
 	t30_get_transfer_statistics(s, &tstats);
@@ -520,15 +526,25 @@ static int faxToMail (struct ast_channel *fxchan, char* attach, char* attachType
 		ast_log(LOG_ERROR, "Unable to read template in rxfax.\n");
 		return -1;
 	}
-	
-	p = popen("/usr/sbin/sendmail -t", "w");
+	ast_log(LOG_DEBUG, "Read fax_template.html\n");
+
+	pfd = mkstemp(tmp);
+	if (pfd > -1) {
+		p = fdopen(pfd, "w");
+		if (!p) {
+			close(pfd);
+			pfd = -1;
+		}
+	}	
 	if (p) {
 		fprintf(p, "From: %s\n", email_from);
+		ast_log(LOG_DEBUG, "Lookup email address for %s\n", local_ident);
 		fxemail = getFaxUserEmail(local_ident);
 		if (!fxemail) {
 			ast_log(LOG_WARNING, "Couldn't find %s in fax.conf, sending to root@localhost\n", local_ident);
 			fxemail = "root@localhost";
 		}
+		ast_log(LOG_DEBUG, "Got email address of %s\n", fxemail);
 		fprintf(p,"To: %s\n",fxemail);
 #if (ASTERISK_VERSION_NUM <= 011000)
     	fprintf(p, "Subject: New Fax From %s.\n",(fxchan->callerid ? fxchan->callerid : "Unknown"));
@@ -580,7 +596,10 @@ static int faxToMail (struct ast_channel *fxchan, char* attach, char* attachType
 		base_encode(attach, p);
 		ast_mutex_unlock(&base64_lock);
 		fprintf(p, "\n\n--%s--\n.\n",bound);
-		pclose(p);
+		fclose(p);
+		snprintf(tmp2, sizeof(tmp2), "( %s < %s ; rm -f %s ) &", "/usr/sbin/sendmail -t", tmp, tmp);
+		ast_safe_system(tmp2);
+		ast_log(LOG_DEBUG, "Sent mail with command '%s'\n", tmp2);
 	}
 	if (template)
 		free(template);
