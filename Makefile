@@ -445,7 +445,7 @@ ARCH	= $(shell uname -p)
 endif
 PKGARCHIVE = $(shell pwd)/$(shell uname -s)-$(shell uname -r).$(shell uname -m)
 
-pkg: all pkgdepend $(PKGARCHIVE) pkginfo
+pkg: svnver all pkgdepend $(PKGARCHIVE) pkginfo
 	pkgmk -oa `uname -m` -d $(PKGARCHIVE) -f prototype
 	pkgtrans -s $(PKGARCHIVE) SVasterisk-`uname -m`-`uname -r`.pkg SVasterisk
 
@@ -463,6 +463,9 @@ $(PKGARCHIVE):
 pkginfo:
 	sed -e 's/<version>/$(ASTERISKVERSIONNUM),REV=$(REV)/' pkginfo_src | \
 	sed -e 's/<arch>/$(ARCH)/' > $@ 
+
+svnver:
+	echo "asterisk-1.2.7.1-solvoip-`svn info | grep Revision | awk '{ print $$2 }'`" >.version
 
 rhelsrc:
 	test -d /tmp/sv-rpm-src/asterisk-1.2.7.1 || mkdir -p /tmp/sv-rpm-src/asterisk-1.2.7.1

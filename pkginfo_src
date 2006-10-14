@@ -8,5 +8,5 @@ EMAIL=joe@thrallingpenguin.com
 ISTATES="S s 1 2 3"
 RSTATES="S s 1 2 3"
 BASEDIR=/
-CLASSES=none
+CLASSES=preserve none
 MAXINST=9999
