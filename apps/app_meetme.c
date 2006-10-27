@@ -886,6 +886,11 @@ static int conf_run(struct ast_channel *chan, struct ast_conference *conf, int c
 		conf->firstuser = user;
 		conf->lastuser = user;
 	} else {
+		if (!conf->lastuser) {
+			ast_log(LOG_WARNING, "Error lastuser is NULL!\n");
+			ast_mutex_unlock(&conflock);
+			goto outrun;
+		}
 		/* Fill the new user struct */	
 		user->user_no = conf->lastuser->user_no + 1; 
 		user->prevuser = conf->lastuser;
