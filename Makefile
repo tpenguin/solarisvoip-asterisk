@@ -445,6 +445,12 @@ ARCH	= $(shell uname -p)
 endif
 PKGARCHIVE = $(shell pwd)/$(shell uname -s)-$(shell uname -r).$(shell uname -m)
 
+dev-pkg: svnver all $(PKGARCHIVE) pkginfo
+	[ -f prototype_dev_modules ] || rm -f prototype_dev_modules
+	find . -name "*.so" | sed 's|^./||g' | perl -ne 'chomp; print "f none opt/asterisk/lib/modules/", `basename $$_ | tr -d "\n"` , "=$$_ 0755 root root\n"' >prototype_dev_modules
+	pkgmk -oa `uname -m` -d $(PKGARCHIVE) -f prototype_dev
+	pkgtrans -s $(PKGARCHIVE) SVasterisk-dev-`uname -m`-`uname -r`.pkg SVasterisk
+	
 pkg: svnver all pkgdepend $(PKGARCHIVE) pkginfo
 	pkgmk -oa `uname -m` -d $(PKGARCHIVE) -f prototype
 	pkgtrans -s $(PKGARCHIVE) SVasterisk-`uname -m`-`uname -r`.pkg SVasterisk
