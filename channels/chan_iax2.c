@@ -2188,7 +2188,7 @@ static int get_from_jb(void *p)
 
     now = ast_tvdiff_ms(tv, pvt->rxcore);
 
-    if(now >= (next = jb_next(pvt->jb))) {
+    if(now >= (next = jb_next(pvt->jb)) && pvt->jb != NULL) {
 		ret = jb_get(pvt->jb,&frame,now,ast_codec_interp_len(pvt->voiceformat));
 		switch(ret) {
 		case JB_OK:
