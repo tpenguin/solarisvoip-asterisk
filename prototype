@@ -19,6 +19,7 @@ f none opt/asterisk/lib/modules/chan_local.so=channels/chan_local.so 0755 root r
 f none opt/asterisk/lib/modules/chan_skinny.so=channels/chan_skinny.so 0755 root root
 f none opt/asterisk/lib/modules/chan_features.so=channels/chan_features.so 0755 root root
 f none opt/asterisk/lib/modules/chan_zap.so=channels/chan_zap.so 0755 root root
+f none opt/asterisk/lib/modules/app_amd.so=apps/app_amd.so 0755 root root
 f none opt/asterisk/lib/modules/app_dial.so=apps/app_dial.so 0755 root root
 f none opt/asterisk/lib/modules/app_playback.so=apps/app_playback.so 0755 root root
 f none opt/asterisk/lib/modules/app_voicemail.so=apps/app_voicemail.so 0755 root root
@@ -515,6 +516,7 @@ d none etc/opt/asterisk 0755 root root
 e preserve etc/opt/asterisk/adsi.conf=configs/adsi.conf.sample 0644 root root
 e preserve etc/opt/asterisk/adtranvofr.conf=configs/adtranvofr.conf.sample 0644 root root
 e preserve etc/opt/asterisk/agents.conf=configs/agents.conf.sample 0644 root root
+e preserve etc/opt/asterisk/amd.conf=configs/amd.conf 0644 root root
 e preserve etc/opt/asterisk/alarmreceiver.conf=configs/alarmreceiver.conf.sample 0644 root root
 e preserve etc/opt/asterisk/alsa.conf=configs/alsa.conf.sample 0644 root root
 e preserve etc/opt/asterisk/cdr.conf=configs/cdr.conf.sample 0644 root root

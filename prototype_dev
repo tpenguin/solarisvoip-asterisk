@@ -389,6 +389,7 @@ e preserve etc/opt/asterisk/adtranvofr.conf=configs/adtranvofr.conf.sample 0644 
 e preserve etc/opt/asterisk/agents.conf=configs/agents.conf.sample 0644 root root
 e preserve etc/opt/asterisk/alarmreceiver.conf=configs/alarmreceiver.conf.sample 0644 root root
 e preserve etc/opt/asterisk/alsa.conf=configs/alsa.conf.sample 0644 root root
+e preserve etc/opt/asterisk/amd.conf=configs/amd.conf 0644 root root
 e preserve etc/opt/asterisk/cdr.conf=configs/cdr.conf.sample 0644 root root
 e preserve etc/opt/asterisk/cdr_custom.conf=configs/cdr_custom.conf.sample 0644 root root
 e preserve etc/opt/asterisk/cdr_manager.conf=configs/cdr_manager.conf.sample 0644 root root
