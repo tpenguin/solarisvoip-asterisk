@@ -15,9 +15,9 @@ MODS=res_indications.so res_monitor.so res_adsi.so res_agi.so res_features.so
 
 ifneq ($(wildcard $(CROSS_COMPILE_TARGET)/usr/include/odbcinst.h)$(wildcard $(CROSS_COMPILE_TARGET)/usr/local/include/odbcinst.h),)
   ifneq (${OSARCH},FreeBSD)
-    MODS+=res_config_odbc.so
+    MODS+=res_config_odbc.so res_config_astdb.so
   else
-    MODS+=$(shell if test ${BSDVERSION} -ge 500000 ; then echo "res_config_odbc.so"; fi)
+    MODS+=$(shell if test ${BSDVERSION} -ge 500000 ; then echo "res_config_odbc.so res_config_astdb.so"; fi)
   endif
   MODS+=res_odbc.so
 endif
@@ -109,6 +109,9 @@ res_features.so: res_features.o
 res_config_odbc.so: res_config_odbc.o
 	$(CC) $(SOLINK) -o $@ ${CYGSOLINK} $< ${CYGSOLIB} ${CYG_RES_CONFIG_ODBC_LIB}
 
+res_config_astdb.so: res_config_astdb.o
+	$(CC) $(SOLINK) -o $@ ${CYGSOLINK} $< ${CYGSOLIB}
+   
 ifneq ($(wildcard .depend),)
   include .depend
 endif
