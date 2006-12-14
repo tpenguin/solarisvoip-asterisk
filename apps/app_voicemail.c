@@ -1,9 +1,13 @@
 /*
  * Asterisk -- An open source telephony toolkit.
  *
- * Copyright (C) 1999 - 2005, Digium, Inc.
+ * Original version:
+ * Copyright (C) 1999 - 2006, Digium, Inc.
  *
  * Mark Spencer <markster@digium.com>
+ * 
+ * Updated version:
+ * Copyright (C) 2006 Sun Microsystems>
  *
  * See http://www.asterisk.org for more information about
  * the Asterisk project. Please do not directly contact
@@ -71,6 +75,7 @@ ASTERISK_FILE_VERSION(__FILE__, "$Revision: 19394 $")
 #include "asterisk/localtime.h"
 #include "asterisk/cli.h"
 #include "asterisk/utils.h"
+#include "asterisk/astdb.h"
 #ifdef USE_ODBC_STORAGE
 #include "asterisk/res_odbc.h"
 #endif
@@ -85,6 +90,9 @@ ASTERISK_FILE_VERSION(__FILE__, "$Revision: 19394 $")
 /* Default mail command to mail voicemail. Change it with the
     mailcmd= command in voicemail.conf */
 #define SENDMAIL "/usr/sbin/sendmail -t"
+
+/* Default realtime password configuration */
+#define REALTIME_PWD "none"
 
 #define INTRO "vm-intro"
 
@@ -114,6 +122,7 @@ ASTERISK_FILE_VERSION(__FILE__, "$Revision: 19394 $")
 #define VM_DELETE		(1 << 12)
 #define VM_ALLOCED		(1 << 13)
 #define VM_SEARCH		(1 << 14)
+#define VM_STOREPWD  (1 << 15) 
 
 #define ERROR_LOCK_PATH		-100
 
@@ -139,6 +148,8 @@ AST_APP_OPTIONS(vm_app_options, {
 	AST_APP_OPTION('p', OPT_PREPEND_MAILBOX),
 	AST_APP_OPTION('j', OPT_PRIORITY_JUMP),
 });
+
+AST_MUTEX_DEFINE_STATIC(appvmlock);
 
 static int load_config(void);
 
@@ -384,6 +395,7 @@ static int maxmsg;
 static int silencethreshold = 128;
 static char serveremail[80];
 static char mailcmd[160];	/* Configurable mail cmd */
+static char realtimepwd[80];  /* Configurable realtime database for password */
 static char externnotify[160]; 
 
 static char vmfmts[80];
@@ -507,6 +519,40 @@ static int change_password_realtime(struct ast_vm_user *vmu, const char *passwor
 	}
 	return -1;
 }
+
+static int change_password_astdb(struct ast_vm_user *vmu, const char *password)
+{
+   char astdbres[256];
+	char searchstr[256];
+	char *astdbpass, *temp;
+   /* Password to database if using Astdb Realtime */
+	/* [context_section]
+      extension_number => voicemail_password,user_name,user_email_address,user_pager_email_address,user_option(s) */
+	strcpy(searchstr, vmu->context);
+	strcat(searchstr, ".");
+	strcat(searchstr, vmu->mailbox);  
+	int res = 0;   
+	   
+	/* If the database already contain the entry, store to the database */
+	if(!ast_db_get("voicemail.conf", searchstr, astdbres, sizeof(astdbres))) {
+	  if(!ast_strlen_zero(astdbres)) {
+	     astdbpass = strtok(astdbres, ",");
+	     temp = strtok(NULL, "\n");
+	     if(strcmp(astdbpass, password)) {
+	        /* write the new password into the Asterisk Database */
+	        snprintf(astdbres, sizeof(astdbres), "%s,%s", password, temp);
+	        res = ast_db_put("voicemail.conf", searchstr, astdbres); 
+	        if(res) {
+	           ast_log(LOG_WARNING, "app_voicemail: astdb error, password not changed for Mailbox: %s or asterisk database realtime.\n", vmu->mailbox);
+	        } else {
+	           ast_log(LOG_WARNING, "app_voicemail: password changed for Mailbox: %s for asterisk database realtime.\n", vmu->mailbox);
+	        }
+        }
+	  }     
+   }
+   return res;	 
+}
+
 
 static void apply_options(struct ast_vm_user *vmu, const char *options)
 {	/* Destructively Parse options and apply */
@@ -638,14 +684,29 @@ static void vm_change_password(struct ast_vm_user *vmu, const char *newpassword)
 	int linenum=0;
 	char inbuf[256];
 	char orig[256];
-	char currcontext[256] ="";
+	char currcontext[256] = "";
 	char tmpin[AST_CONFIG_MAX_PATH];
 	char tmpout[AST_CONFIG_MAX_PATH];
 	struct stat statbuf;
-
+	char *realtimedb, *realtimetb;
+   
 	if (!change_password_realtime(vmu, newpassword))
 		return;
 
+	/* Different database configurations for realtime password goes here */
+   if(!ast_strlen_zero(realtimepwd) && strcmp(realtimepwd, "none")) {
+	   realtimedb = strtok(realtimepwd, ",");
+	   realtimetb = strtok(NULL, ",");
+      
+      if(realtimedb != NULL && realtimetb != NULL) {
+         if(!strcmp(realtimedb, "astdb") && !change_password_astdb(vmu, newpassword)  ) {
+            return;
+         } 
+         /* add more for different databases */
+      }
+   }
+		
+	/* Password to voicemail.conf */
 	snprintf(tmpin, sizeof(tmpin), "%s/voicemail.conf", ast_config_AST_CONFIG_DIR);
 	snprintf(tmpout, sizeof(tmpout), "%s/voicemail.conf.new", ast_config_AST_CONFIG_DIR);
 	configin = fopen(tmpin,"r");
@@ -766,6 +827,7 @@ static void vm_change_password(struct ast_vm_user *vmu, const char *newpassword)
 static void vm_change_password_shell(struct ast_vm_user *vmu, char *newpassword)
 {
 	char buf[255];
+   
 	snprintf(buf,255,"%s %s %s %s",ext_pass_cmd,vmu->context,vmu->mailbox,newpassword);
 	if (!ast_safe_system(buf))
 		ast_copy_string(vmu->password, newpassword, sizeof(vmu->password));
@@ -1770,11 +1832,7 @@ static int sendmail(char *srcemail, struct ast_vm_user *vmu, int msgnum, char *c
 				ast_channel_free(ast);
 			} else ast_log(LOG_WARNING, "Cannot allocate the channel for variables substitution\n");
 		} else {
-#ifdef SOLARIS
 			char *template = ast_read_template("/etc/opt/asterisk/vm_template.html");
-#else
-			char *template = ast_read_template("/etc/asterisk/vm_template.html");
-#endif
 			if (!template) {
 				ast_log(LOG_ERROR, "Unable to read template in voicemail.\n");
 			} else {
@@ -5741,9 +5799,13 @@ static char show_voicemail_zones_help[] =
 "Usage: show voicemail zones\n"
 "       Lists zone message formats\n";
 
+static char voicemail_reload_help[] =
+"Usage: voicemail reload\n"
+"       Reload voicemail application\n";
+
 static int handle_show_voicemail_users(int fd, int argc, char *argv[])
 {
-	struct ast_vm_user *vmu = users;
+   struct ast_vm_user *vmu = users;
 	char *output_format = "%-10s %-5s %-25s %-10s %6s\n";
 
 	if ((argc < 3) || (argc > 5) || (argc == 4)) return RESULT_SHOWUSAGE;
@@ -5820,7 +5882,7 @@ static char *complete_show_voicemail_users(char *line, char *word, int pos, int 
 	int which = 0;
 	struct ast_vm_user *vmu = users;
 	char *context = "";
-
+   
 	/* 0 - show; 1 - voicemail; 2 - users; 3 - for; 4 - <context> */
 	if (pos > 4)
 		return NULL;
@@ -5844,6 +5906,14 @@ static char *complete_show_voicemail_users(char *line, char *word, int pos, int 
 	return NULL;
 }
 
+static int handle_voicemail_reload(int fd, int argc, char *argv[])
+{
+	ast_verbose( VERBOSE_PREFIX_3 "handle voicemail reload\n");
+	if(load_config())
+	  return RESULT_FAILURE;
+	return RESULT_SUCCESS;
+}
+
 static struct ast_cli_entry show_voicemail_users_cli =
 	{ { "show", "voicemail", "users", NULL },
 	handle_show_voicemail_users, "List defined voicemail boxes",
@@ -5853,6 +5923,51 @@ static struct ast_cli_entry show_voicemail_zones_cli =
 	{ { "show", "voicemail", "zones", NULL },
 	handle_show_voicemail_zones, "List zone message formats",
 	show_voicemail_zones_help, NULL };
+
+static struct ast_cli_entry voicemail_reload_cli =
+	{ { "voicemail", "reload", NULL },
+	handle_voicemail_reload, "Reload voicemail application",
+	voicemail_reload_help, NULL };	
+
+static int manager_list_voicemail_users(struct mansession *s, struct message *m)
+{
+	struct ast_vm_user *vmu = users;
+	char *output_format = "context: %s\nmailbox: %s\nfullname: %s\nemail: %s\npager: %s\nserveremail: %s\nmailcmd: %s\nlanguage: %s\nzontag: %s\ncallback: %s\ndialout: %s\nuniqueid: %s\nexit: %s\nsaydurationm: %i\nmaxmsg: %i\nmsg count: %s\n\n";
+   char *id = astman_get_header(m, "ActionID");
+       
+   ast_mutex_lock(&appvmlock);
+      	
+	if (vmu) {
+	  ast_cli(s->fd, "Response: Follows\r\n");
+	  ast_cli(s->fd, "ActionID: %s\r\n", id);
+	  while (vmu) {
+			char dirname[256];
+			DIR *vmdir;
+			struct dirent *vment;
+			int vmcount = 0;
+			char count[12];
+
+			make_dir(dirname, 255, vmu->context, vmu->mailbox, "INBOX");
+			if ((vmdir = opendir(dirname))) {
+			   /* No matter what the format of VM, there will always be a .txt file for each message. */
+				while ((vment = readdir(vmdir)))
+					if (strlen(vment->d_name) > 7 && !strncmp(vment->d_name + 7,".txt",4))
+						vmcount++;
+				closedir(vmdir);
+			}
+			snprintf(count,sizeof(count),"%d",vmcount);
+			ast_cli(s->fd, output_format, vmu->context, vmu->mailbox, vmu->fullname, vmu->email, vmu->pager, vmu->serveremail, vmu->mailcmd, vmu->language, vmu->zonetag, vmu->callback, vmu->dialout, vmu->uniqueid, vmu->exit, vmu->saydurationm, vmu->maxmsg, count);
+			vmu = vmu->next;
+		}		
+		ast_cli(s->fd, "--END COMMAND--\r\n\r\n");
+	} else {
+		astman_send_ack(s, m, "There are no voicemail users currently defined.");
+		ast_log(LOG_NOTICE, "There are no voicemail users currently defined.\n");
+	}
+	ast_mutex_unlock(&appvmlock);
+	return RESULT_SUCCESS;
+}
+	
 
 static int load_config(void)
 {
@@ -5879,6 +5994,7 @@ static int load_config(void)
 	char *fmt;
 	char *astemail;
  	char *astmailcmd = SENDMAIL;
+ 	char *astrealtimepwd = REALTIME_PWD;
 	char *s,*q,*stringp;
 	char *dialoutcxt = NULL;
 	char *callbackcxt = NULL;	
@@ -5887,7 +6003,7 @@ static int load_config(void)
 	char *emaildateformatstr;
 	int x;
 	int tmpadsi[4];
-
+      
 	cfg = ast_config_load(VOICEMAIL_CONFIG);
 	ast_mutex_lock(&vmlock);
 	cur = users;
@@ -5900,7 +6016,7 @@ static int load_config(void)
 	zcur = zones;
 	while (zcur) {
 		zl = zcur;
-		zcur = zcur->next;
+	   zcur = zcur->next;
 		free_zone(zl);
 	}
 	zones = NULL;
@@ -5908,7 +6024,7 @@ static int load_config(void)
 	users = NULL;
 	usersl = NULL;
 	memset(ext_pass_cmd, 0, sizeof(ext_pass_cmd));
-
+   
 	if (cfg) {
 		/* General settings */
 
@@ -5920,6 +6036,11 @@ static int load_config(void)
 		if (!(astsearch = ast_variable_retrieve(cfg, "general", "searchcontexts")))
 			astsearch = "no";
 		ast_set2_flag((&globalflags), ast_true(astsearch), VM_SEARCH);
+		
+		/* User password from realtime engine? */
+		strcpy(mailcmd, REALTIME_PWD);
+		if ((astrealtimepwd = ast_variable_retrieve(cfg, "general", "realtimepwd")))
+			ast_copy_string(realtimepwd, astrealtimepwd, sizeof(realtimepwd));
 
 #ifdef USE_ODBC_STORAGE
 		strcpy(odbc_database, "asterisk");
@@ -6295,6 +6416,7 @@ static int load_config(void)
 
 int reload(void)
 {
+	ast_verbose( VERBOSE_PREFIX_3 "Entered app_voicemail.c reload.\n");
 	return(load_config());
 }
 
@@ -6308,6 +6430,8 @@ int unload_module(void)
 	res |= ast_unregister_application(app4);
 	res |= ast_cli_unregister(&show_voicemail_users_cli);
 	res |= ast_cli_unregister(&show_voicemail_zones_cli);
+	res |= ast_cli_unregister(&voicemail_reload_cli);
+	res |= ast_manager_unregister("ListAllVoicemailUsers");
 	ast_uninstall_vm_functions();
 	
 	STANDARD_HANGUP_LOCALUSERS;
@@ -6322,6 +6446,8 @@ int load_module(void)
 	res |= ast_register_application(app2, vm_execmain, synopsis_vmain, descrip_vmain);
 	res |= ast_register_application(app3, vm_box_exists, synopsis_vm_box_exists, descrip_vm_box_exists);
 	res |= ast_register_application(app4, vmauthenticate, synopsis_vmauthenticate, descrip_vmauthenticate);
+	
+	res |= ast_manager_register("ListAllVoicemailUsers", EVENT_FLAG_CALL, manager_list_voicemail_users, "List All Voicemail User Information");
 	if (res)
 		return(res);
 
@@ -6331,6 +6457,8 @@ int load_module(void)
 
 	ast_cli_register(&show_voicemail_users_cli);
 	ast_cli_register(&show_voicemail_zones_cli);
+   ast_cli_register(&voicemail_reload_cli);
+
 
 	/* compute the location of the voicemail spool directory */
 	snprintf(VM_SPOOL_DIR, sizeof(VM_SPOOL_DIR), "%s/voicemail/", ast_config_AST_SPOOL_DIR);
@@ -6778,4 +6906,7 @@ char *key()
 {
 	return ASTERISK_GPL_KEY;
 }
+
+
+
 
