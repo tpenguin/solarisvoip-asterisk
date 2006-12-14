@@ -72,6 +72,10 @@ maxlogins=3
 ;fromstring=The Asterisk PBX
 ; Permit finding entries for forward/compose from the directory
 ;usedirectory=yes
+; Should the voicemail passwords be stored in a database in realtime
+; ex. realtimepwd=[database name],[table name] 
+;realtimepwd=astdb,asterisk
+
 ;
 ; Change the from, body and/or subject, variables:
 ;     VM_NAME, VM_DUR, VM_MSGNUM, VM_MAILBOX, VM_CALLERID, VM_CIDNUM,

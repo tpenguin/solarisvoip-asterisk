@@ -19,6 +19,13 @@
 ;
 ;queues.conf => odbc,asterisk,ast_config
 ;
+;
+; Asterisk database realtime static configuration examples
+; sip.conf => astdb,asterisk
+; iax.conf => astdb,asterisk
+; voicemail.conf => astdb,asterisk
+; test.conf => astdb,asterisk
+;
 ; The following files CANNOT be loaded from Realtime storage:
 ;	asterisk.conf
 ;	extconfig.conf (this file)
