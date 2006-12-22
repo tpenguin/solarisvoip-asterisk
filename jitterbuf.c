@@ -759,6 +759,7 @@ static int _jb_get(jitterbuf *jb, jb_frame *frameout, long now, long interpl)
 
 long jb_next(jitterbuf *jb) 
 {
+    if (jb == NULL) return JB_LONGMAX;
 	if (jb->info.silence_begin_ts) {
 		long next = queue_next(jb);
 		if (next > 0) { 
