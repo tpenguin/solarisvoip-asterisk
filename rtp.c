@@ -533,7 +533,7 @@ struct ast_frame *ast_rtp_read(struct ast_rtp *rtp)
 				duration &= 0xFFFF;
 				ast_verbose("Got rfc2833 RTP packet from %s:%d (type %d, seq %d, ts %d, len %d, mark %d, event %08x, end %d, duration %d) \n", ast_inet_ntoa(iabuf, sizeof(iabuf), sin.sin_addr), ntohs(sin.sin_port), payloadtype, seqno, timestamp, res - hdrlen, (mark?1:0), event, ((event_end & 0x80)?1:0), duration);
 			}
-			if (rtp->lasteventseqn <= seqno || rtp->resp == 0 || (rtp->lasteventseqn >= 65530 && seqno <= 6)) {
+			if (rtp->lasteventseqn <= seqno || (rtp->lasteventseqn >= 65530 && seqno <= 6)) {
 				f = process_rfc2833(rtp, rtp->rawdata + AST_FRIENDLY_OFFSET + hdrlen, res - hdrlen, seqno);
 				rtp->lasteventseqn = seqno;
 			} else
