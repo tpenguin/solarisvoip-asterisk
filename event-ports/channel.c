@@ -31,6 +31,11 @@
 #include <unistd.h>
 #include <math.h>			/* For PI */
 
+#ifdef EVENT_PORT
+#include <port.h>
+#include <sys/port_impl.h>
+#endif
+
 #ifdef ZAPTEL_OPTIMIZATIONS
 #include <sys/ioctl.h>
 #ifdef __linux__
@@ -1491,6 +1496,8 @@ int ast_waitfor_n_fd(int *fds, int n, int *ms, int *exception)
 	return winner;
 }
 
+#ifndef EVENT_PORT
+
 /*--- ast_waitfor_nanfds: Wait for x amount of time on a file descriptor to have input.  */
 struct ast_channel *ast_waitfor_nandfds(struct ast_channel **c, int n, int *fds, int nfds, 
 	int *exception, int *outfd, int *ms)
@@ -1649,6 +1656,281 @@ struct ast_channel *ast_waitfor_nandfds(struct ast_channel **c, int n, int *fds,
 	}
 	return winner;
 }
+
+#else /* EVENT_PORT */
+
+/*--- ast_waitfor_nanfds: Wait for x amount of time on a file descriptor to have input.  */
+struct ast_channel *ast_waitfor_nandfds(struct ast_channel **c, int n, int *fds, int nfds, 
+	int *exception, int *outfd, int *ms)
+{
+	struct timeval start = { 0 , 0 };
+	// struct pollfd *pfds;
+	int res;
+	long rms;
+	int x, y, max;
+	int spoint;
+	time_t now = 0;
+	long whentohangup = 0, havewhen = 0, diff;
+	struct ast_channel *winner = NULL;
+
+    int port;
+    port_event_t *pevl = NULL;
+    struct timespec timeout;
+    uint_t nget;
+    int index;
+    
+/*
+	pfds = alloca(sizeof(struct pollfd) * (n * AST_MAX_FDS + nfds));
+	if (!pfds) {
+		ast_log(LOG_ERROR, "Out of memory\n");
+		*outfd = -1;
+		return NULL;
+	}
+*/
+	if (outfd)
+		*outfd = -99999;
+	if (exception)
+		*exception = 0;
+	
+	/* Perform any pending masquerades */
+	for (x=0; x < n; x++) {
+		ast_mutex_lock(&c[x]->lock);
+		if (c[x]->whentohangup) {
+			if (!havewhen)
+				time(&now);
+			diff = c[x]->whentohangup - now;
+			if (!havewhen || (diff < whentohangup)) {
+				havewhen++;
+				whentohangup = diff;
+			}
+		}
+		if (c[x]->masq) {
+			if (ast_do_masquerade(c[x])) {
+				ast_log(LOG_WARNING, "Masquerade failed\n");
+				*ms = -1;
+				ast_mutex_unlock(&c[x]->lock);
+				return NULL;
+			}
+		}
+		ast_mutex_unlock(&c[x]->lock);
+	}
+
+	rms = *ms;
+	
+	if (havewhen) {
+		if ((*ms < 0) || (whentohangup * 1000 < *ms)) {
+			rms =  whentohangup * 1000;
+		}
+	}
+
+    // create port
+    port = port_create();
+    if (port < 0) {
+        ast_log(LOG_ERROR, "Creation of port failed.\n");
+        *ms = -1;
+        return (NULL);
+    }
+
+
+    // add channel FDs
+	max = 0;
+	for (x=0; x < n; x++) { // n = number of passed in channels
+		for (y=0; y< AST_MAX_FDS; y++) {
+			if (c[x]->fds[y] > -1) {
+				// pfds[max].fd = c[x]->fds[y];
+				// pfds[max].events = POLLIN | POLLPRI;
+				// pfds[max].revents = 0;
+                if (port_associate(port, PORT_SOURCE_FD, (uintptr_t)c[x]->fds[y], POLLIN, NULL) == -1) {
+                    ast_log(LOG_ERROR, "port_associate returned an error\n");
+                    close(port);
+                    *ms = -1;
+                    return (NULL);
+                }
+				max++;
+			}
+		}
+		CHECK_BLOCKING(c[x]);
+	}
+    // add function input FDs
+	for (x=0; x < nfds; x++) {
+		if (fds[x] > -1) {
+			// pfds[max].fd = fds[x];
+			// pfds[max].events = POLLIN | POLLPRI;
+			// pfds[max].revents = 0;
+            if (port_associate(port, PORT_SOURCE_FD, (uintptr_t)fds[x], POLLIN, NULL) == -1) {
+                ast_log(LOG_ERROR, "port_associate returned an error.\n");
+                close(port);
+                *ms = -1;
+                return (NULL);
+            }
+			max++;
+		}
+	}
+	if (*ms > 0) 
+		start = ast_tvnow();
+
+/*
+	if (sizeof(int) == 4) {
+		do {
+			int kbrms = rms;
+			if (kbrms > 600000)
+				kbrms = 600000;
+			res = poll(pfds, max, kbrms);
+			if (!res)
+				rms -= kbrms;
+		} while (!res && (rms > 0));
+	} else {
+		res = poll(pfds, max, rms);
+	}
+*/
+
+    pevl = calloc(max + 1, sizeof (port_event_t));
+
+    timeout.tv_sec = 0;
+    timeout.tv_nsec = rms * 1000000L;
+
+    res = port_getn(port, pevl, max < PORT_MAX_LIST ? max : PORT_MAX_LIST, &nget, &timeout);
+
+	if (res < 0) {
+		for (x=0; x < n; x++) 
+			ast_clear_flag(c[x], AST_FLAG_BLOCKING);
+        if (errno == ETIME) {
+            *ms = 0;
+        } else if (errno != EINTR) /* Simulate a timeout if we were interrupted */
+			*ms = -1;
+		else {
+			/* Just an interrupt */
+#if 0
+			*ms = 0;
+#endif			
+		}
+        winner = NULL;
+        goto port_cleanup;
+    } else {
+		if (nget == 0)
+			*ms = 0;
+    }
+
+	if (havewhen)
+		time(&now);
+	spoint = 0;
+	for (x=0; x < n; x++) {
+		ast_clear_flag(c[x], AST_FLAG_BLOCKING);
+		if (havewhen && c[x]->whentohangup && (now > c[x]->whentohangup)) {
+			c[x]->_softhangup |= AST_SOFTHANGUP_TIMEOUT;
+			if (!winner)
+				winner = c[x];
+		}
+        // for each of the FDs that came back, do the proper thing
+		for (y=0; y < AST_MAX_FDS; y++) {
+			if (c[x]->fds[y] > -1) {
+                for (index = 0; index < nget; index++) {
+                    if ((&pevl[index])->portev_object == c[x]->fds[y]) {
+                        /*
+    					if (res & POLLPRI)
+    						ast_set_flag(c[x], AST_FLAG_EXCEPTION);
+    					else
+                        */
+    						ast_clear_flag(c[x], AST_FLAG_EXCEPTION);
+    					c[x]->fdno = y;
+    					winner = c[x];
+                    }
+                }
+                /*
+				if ((res = ast_fdisset(pfds, c[x]->fds[y], max, &spoint))) {
+					if (res & POLLPRI)
+						ast_set_flag(c[x], AST_FLAG_EXCEPTION);
+					else
+						ast_clear_flag(c[x], AST_FLAG_EXCEPTION);
+					c[x]->fdno = y;
+					winner = c[x];
+				}
+                */
+                // disassociate the port, while we can!
+                /*
+                if (port_dissociate(port, PORT_SOURCE_FD, (uintptr_t)c[x]->fds[y]) == -1) {
+                    ast_log(LOG_ERROR, "port_dissociate failed.\n");
+                }
+                */
+			}
+		}
+	}
+	for (x=0; x < nfds; x++) {
+		if (fds[x] > -1) {
+            for (index = 0; index < nget; index++) {
+                if ((&pevl[index])->portev_object == fds[x]) {
+    				if (outfd)
+    					*outfd = fds[x];
+    				if (exception) {
+                        /*
+    					if (res & POLLPRI) 
+    						*exception = -1;
+    					else
+                        */
+    						*exception = 0;
+    				}
+    				winner = NULL;
+                }
+            }
+            /*
+			if ((res = ast_fdisset(pfds, fds[x], max, &spoint))) {
+				if (outfd)
+					*outfd = fds[x];
+				if (exception) {	
+					if (res & POLLPRI) 
+						*exception = -1;
+					else
+						*exception = 0;
+				}
+				winner = NULL;
+			}
+            */
+            // disassociate the port, while we can!
+            /*
+            if (port_dissociate(port, PORT_SOURCE_FD, (uintptr_t)fds[x]) == -1) {
+                ast_log(LOG_ERROR, "port_dissociate failed.\n");
+            }
+            */
+		}	
+	}
+	if (*ms > 0) {
+		*ms -= ast_tvdiff_ms(ast_tvnow(), start);
+		if (*ms < 0)
+			*ms = 0;
+	}
+
+    close(port);
+    free(pevl);
+    return (winner);
+
+port_cleanup:
+    // port_dissociate
+	for (x=0; x < n; x++) { // n = number of passed in channels
+		for (y=0; y< AST_MAX_FDS; y++) {
+			if (c[x]->fds[y] > -1) {
+                if (port_dissociate(port, PORT_SOURCE_FD, (uintptr_t)c[x]->fds[y]) == -1) {
+                    ast_log(LOG_ERROR, "port_dissociate returned an error\n");
+                }
+			}
+		}
+	}
+	for (x=0; x < nfds; x++) {
+		if (fds[x] > -1) {
+            // disassociate the port, while we can!
+            if (port_dissociate(port, PORT_SOURCE_FD, (uintptr_t)fds[x]) == -1) {
+                ast_log(LOG_ERROR, "port_dissociate failed.\n");
+            }
+		}	
+	}
+    close(port);
+    free(pevl);
+	return winner;
+}
+
+#endif
+
+
+
 
 struct ast_channel *ast_waitfor_n(struct ast_channel **c, int n, int *ms)
 {

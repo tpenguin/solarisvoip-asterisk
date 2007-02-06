@@ -231,6 +231,7 @@ ifeq ($(OSARCH),SunOS)
   GREP=/usr/xpg4/bin/grep
   M4=/usr/local/bin/m4
   ID=/usr/xpg4/bin/id
+  OPTIONS+=-DEVENT_PORT
 endif
 
 INCLUDE+=-Iinclude -I../include
