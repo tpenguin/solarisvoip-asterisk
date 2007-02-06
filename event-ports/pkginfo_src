@@ -1,0 +1,12 @@
+PKG=SVasterisk
+NAME=Asterisk PBX
+VERSION=1.2.7.1
+ARCH=<arch>
+CATEGORY=system
+VENDOR=SolarisVoip.com
+EMAIL=joe@thrallingpenguin.com
+ISTATES="S s 1 2 3"
+RSTATES="S s 1 2 3"
+BASEDIR=/
+CLASSES=preserve none
+MAXINST=9999
