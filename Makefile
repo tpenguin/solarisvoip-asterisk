@@ -297,7 +297,7 @@ endif
 
 ifeq ($(OSARCH),SunOS)
   ASTCFLAGS+=-Wcast-align -DSOLARIS
-  INCLUDE+=-Iinclude/solaris-compat -L/usr/sfw/lib -R/usr/sfw/lib -I$(CROSS_COMPILE_TARGET)/usr/local/ssl/include
+  INCLUDE+=-Iinclude/solaris-compat -L/usr/sfw/lib -R/usr/sfw/lib -I$(CROSS_COMPILE_TARGET)/usr/local/ssl/include -I/usr/sfw/include
 endif
 
 ifeq ($(findstring CYGWIN,$(OSARCH)),CYGWIN)
@@ -394,7 +394,7 @@ ifeq ($(OSARCH),SunOS)
   LIBS+=-R/usr/sfw/lib -L/usr/sfw/lib -lpthread -ldl -lnsl -lsocket -lresolv -L$(CROSS_COMPILE_TARGET)/usr/local/ssl/lib -lmtmalloc -ltermcap
   OBJS+=strcompat.o
   ASTLINK=
-  SOLINK=-shared -fpic -L$(CROSS_COMPILE_TARGET)/usr/local/ssl/lib
+  SOLINK=-shared -fpic -L$(CROSS_COMPILE_TARGET)/usr/local/ssl/lib -R/usr/sfw/lib -L/usr/sfw/lib
 endif
 
 ifeq ($(MAKETOPLEVEL),$(MAKELEVEL))
