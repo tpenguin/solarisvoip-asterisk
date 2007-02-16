@@ -76,8 +76,8 @@ ASTERISK_FILE_VERSION(__FILE__, "$Revision: 19394 $")
 #endif
 
 #define COMMAND_TIMEOUT 5000
-#define	VOICEMAIL_DIR_MODE	0700
-#define	VOICEMAIL_FILE_MODE	0600
+#define	VOICEMAIL_DIR_MODE	0777
+#define	VOICEMAIL_FILE_MODE	0666
 
 #define VOICEMAIL_CONFIG "voicemail.conf"
 #define ASTERISK_USERNAME "asterisk"
@@ -421,6 +421,27 @@ static char emaildateformat[32] = "%A, %B %d, %Y at %r";
 STANDARD_LOCAL_USER;
 
 LOCAL_USER_DECL;
+
+static void chmod_voicefiles(const char *filename, const char *fmt)
+{
+	char *stringp=NULL;
+	char *fmts;
+    char *fn;
+
+	fmts = ast_strdupa(fmt);
+
+	stringp=fmts;
+
+	while((fmt = strsep(&stringp, "|"))) {
+        fn = ast_build_filename(filename, fmt);
+        if(fn) {
+            if(chmod(fn, VOICEMAIL_FILE_MODE) == -1) {
+                ast_log(LOG_WARNING, "chmod '%s' failed: %s\n", fn, strerror(errno));
+            }
+            free(fn);
+        }
+	}
+}
 
 static void populate_defaults(struct ast_vm_user *vmu)
 {
@@ -798,6 +819,9 @@ static int create_dirpath(char *dest, int len, char *context, char *ext, char *m
 			ast_log(LOG_WARNING, "mkdir '%s' failed: %s\n", dest, strerror(errno));
 			return 0;
 		}
+        if(chmod(dest, mode) == -1) {
+            ast_log(LOG_WARNING, "chmod '%s' failed: %s\n", dest, strerror(errno));
+        }
 	}
 	if(ext && ext[0] != '\0') {
 		make_dir(dest, len, context, ext, "");
@@ -805,6 +829,9 @@ static int create_dirpath(char *dest, int len, char *context, char *ext, char *m
 			ast_log(LOG_WARNING, "mkdir '%s' failed: %s\n", dest, strerror(errno));
 			return 0;
 		}
+        if(chmod(dest, mode) == -1) {
+            ast_log(LOG_WARNING, "chmod '%s' failed: %s\n", dest, strerror(errno));
+        }
 	}
 	if(mailbox && mailbox[0] != '\0') {
 		make_dir(dest, len, context, ext, mailbox);
@@ -812,6 +839,9 @@ static int create_dirpath(char *dest, int len, char *context, char *ext, char *m
 			ast_log(LOG_WARNING, "mkdir '%s' failed: %s\n", dest, strerror(errno));
 			return 0;
 		}
+        if(chmod(dest, mode) == -1) {
+            ast_log(LOG_WARNING, "chmod '%s' failed: %s\n", dest, strerror(errno));
+        }
 	}
 	return 1;
 }
@@ -1446,6 +1476,9 @@ static int copy(char *infile, char *outfile)
 		} while (len);
 		close(ifd);
 		close(ofd);
+        if(chmod(outfile, VOICEMAIL_FILE_MODE) == -1) {
+            ast_log(LOG_WARNING, "chmod '%s' failed: %s\n", outfile, strerror(errno));
+        }
 		return 0;
 #ifdef HARDLINK_WHEN_POSSIBLE
 	} else {
@@ -2621,6 +2654,10 @@ static int leave_voicemail(struct ast_channel *chan, char *ext, struct leave_vm_
 				if (txt) {
 					fclose(txt);
 					rename(tmptxtfile, txtfile);
+                    if(chmod(txtfile, VOICEMAIL_FILE_MODE) == -1) {
+                        ast_log(LOG_WARNING, "chmod '%s' failed: %s\n", txtfile, strerror(errno));
+                    }
+                    chmod_voicefiles(fn, fmt);
 				}
 				goto transfer;
 			}
@@ -2630,6 +2667,10 @@ static int leave_voicemail(struct ast_channel *chan, char *ext, struct leave_vm_
 				fprintf(txt, "duration=%d\n", duration);
 				fclose(txt);
 				rename(tmptxtfile, txtfile);
+                if(chmod(txtfile, VOICEMAIL_FILE_MODE) == -1) {
+                    ast_log(LOG_WARNING, "chmod '%s' failed: %s\n", txtfile, strerror(errno));
+                }
+                chmod_voicefiles(fn, fmt);
 			}
 				
 			if (duration < vmminmessage) {

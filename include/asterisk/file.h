@@ -308,6 +308,8 @@ struct ast_frame *ast_readframe(struct ast_filestream *s);
  */
 extern int ast_file_init(void);
 
+/*! Build a filename from a filename prefix and format type */
+char *ast_build_filename(const char *filename, const char *ext);
 
 #define AST_RESERVED_POINTERS 20
 

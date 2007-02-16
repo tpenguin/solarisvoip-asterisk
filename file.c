@@ -323,6 +323,11 @@ static char *build_filename(const char *filename, const char *ext)
 	return fn;
 }
 
+char *ast_build_filename(const char *filename, const char *ext)
+{
+    return build_filename(filename, ext);
+}
+
 static int exts_compare(const char *exts, const char *type)
 {
 	char *stringp = NULL, *ext;
