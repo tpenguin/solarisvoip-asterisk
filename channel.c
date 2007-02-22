@@ -3377,7 +3377,9 @@ enum ast_bridge_result ast_channel_bridge(struct ast_channel *c0, struct ast_cha
 		      "Uniqueid2: %s\r\n"
 		      "CallerID1: %s\r\n"
 		      "CallerID2: %s\r\n",
-		      c0->name, c1->name, c0->uniqueid, c1->uniqueid, c0->cid.cid_num, c1->cid.cid_num);
+		      c0->name, c1->name, c0->uniqueid, c1->uniqueid, 
+              (c0->cid.cid_num ? c0->cid.cid_num : ""), 
+              (c1->cid.cid_num ? c1->cid.cid_num : ""));
                                                                         
 	o0nativeformats = c0->nativeformats;
 	o1nativeformats = c1->nativeformats;
@@ -3474,7 +3476,9 @@ enum ast_bridge_result ast_channel_bridge(struct ast_channel *c0, struct ast_cha
 					      "Uniqueid2: %s\r\n"
 					      "CallerID1: %s\r\n"
 					      "CallerID2: %s\r\n",
-					      c0->name, c1->name, c0->uniqueid, c1->uniqueid, c0->cid.cid_num, c1->cid.cid_num);
+					      c0->name, c1->name, c0->uniqueid, c1->uniqueid, 
+                          (c0->cid.cid_num ? c0->cid.cid_num : ""), 
+                          (c1->cid.cid_num ? c1->cid.cid_num : ""));
 				ast_log(LOG_DEBUG, "Returning from native bridge, channels: %s, %s\n", c0->name, c1->name);
 
 				ast_clear_flag(c0, AST_FLAG_NBRIDGE);
@@ -3515,7 +3519,9 @@ enum ast_bridge_result ast_channel_bridge(struct ast_channel *c0, struct ast_cha
 					      "Uniqueid2: %s\r\n"
 					      "CallerID1: %s\r\n"
 					      "CallerID2: %s\r\n",
-					      c0->name, c1->name, c0->uniqueid, c1->uniqueid, c0->cid.cid_num, c1->cid.cid_num);
+					      c0->name, c1->name, c0->uniqueid, c1->uniqueid, 
+                          (c0->cid.cid_num ? c0->cid.cid_num : ""), 
+                          (c1->cid.cid_num ? c1->cid.cid_num : ""));
 				return AST_BRIDGE_FAILED;
 			}
 			o0nativeformats = c0->nativeformats;
@@ -3536,7 +3542,9 @@ enum ast_bridge_result ast_channel_bridge(struct ast_channel *c0, struct ast_cha
 		      "Uniqueid2: %s\r\n"
 		      "CallerID1: %s\r\n"
 		      "CallerID2: %s\r\n",
-		      c0->name, c1->name, c0->uniqueid, c1->uniqueid, c0->cid.cid_num, c1->cid.cid_num);
+		      c0->name, c1->name, c0->uniqueid, c1->uniqueid, 
+              (c0->cid.cid_num ? c0->cid.cid_num : ""), 
+              (c1->cid.cid_num ? c1->cid.cid_num : ""));
 	ast_log(LOG_DEBUG, "Bridge stops bridging channels %s and %s\n", c0->name, c1->name);
 
 	return res;
