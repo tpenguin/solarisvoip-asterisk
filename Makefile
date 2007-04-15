@@ -391,7 +391,7 @@ ifeq ($(OSARCH),OpenBSD)
 endif
 
 ifeq ($(OSARCH),SunOS)
-  LIBS+=-R/usr/sfw/lib -L/usr/sfw/lib -lpthread -ldl -lnsl -lsocket -lresolv -L$(CROSS_COMPILE_TARGET)/usr/local/ssl/lib -lmtmalloc -ltermcap
+  LIBS+=-R/usr/sfw/lib -L/usr/sfw/lib -lpthread -ldl -lnsl -lsocket -lresolv -L$(CROSS_COMPILE_TARGET)/usr/local/ssl/lib -lmtmalloc -ltermcap -lrt
   OBJS+=strcompat.o
   ASTLINK=
   SOLINK=-shared -fpic -L$(CROSS_COMPILE_TARGET)/usr/local/ssl/lib -R/usr/sfw/lib -L/usr/sfw/lib

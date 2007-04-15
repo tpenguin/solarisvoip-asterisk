@@ -519,7 +519,23 @@ static void *monmp3thread(void *data)
 			delta = ast_tvdiff_ms(tv_tmp, tv);
 			if (delta < MOH_MS_INTERVAL) {	/* too early */
 				tv = ast_tvadd(tv, ast_samp2tv(MOH_MS_INTERVAL, 1000));	/* next deadline */
+#ifdef SOLARIS
+				/**
+				 * The Solaris usleep(3C) recommends nanosleep(3RT) as a 
+				 * replacement.  Upon Solaris kernel source digging, 
+				 * nanosleep(3RT) uses the cyclic subsystem and is therefore 
+				 * much a more accurate timer. 
+				 */
+				struct timespec rqtp;
+				rqtp.tv_sec = (MOH_MS_INTERVAL - delta) / (unsigned long) 1000000;
+				rqtp.tv_nsec = ((MOH_MS_INTERVAL - delta) % (unsigned long) 1000000) * 1000;
+				
+				if (nanosleep(&rqtp, (struct timespec *) NULL) == -1) {
+					ast_log(LOG_NOTICE, "Nanosleep timer errored.\n");
+				}
+#else
 				usleep(1000 * (MOH_MS_INTERVAL - delta));
+#endif
 				pthread_testcancel();
 			} else {
 				ast_log(LOG_NOTICE, "Request to schedule in the past?!?!\n");
