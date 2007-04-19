@@ -443,17 +443,33 @@ ARCH	= $(shell pkgparam SUNWcsr ARCH)
 else
 ARCH	= $(shell uname -p)
 endif
+ISA	= $(shell uname -p)
+PROC	= $(shell uname -m)
 PKGARCHIVE = $(shell pwd)/$(shell uname -s)-$(shell uname -r).$(shell uname -m)
+ISABITS = $(shell isainfo -b)
+ifeq ($(ISABITS),64)
+	ifeq ($(ISA),i386)
+		PKGARCH=x64
+	else
+		PKGARCH=sparc
+	endif
+else
+	ifeq ($(PROC),sun4u)
+		PKGARCH=sparc
+	else
+		PKGARCH=x86
+	endif
+endif
 
-dev-pkg: svnver all $(PKGARCHIVE) pkginfo
+dev-pkg: svnver all svnverpkg $(PKGARCHIVE) pkginfo
 	[ -f prototype_dev_modules ] || rm -f prototype_dev_modules
 	find . -name "*.so" | sed 's|^./||g' | perl -ne 'chomp; print "f none opt/asterisk/lib/modules/", `basename $$_ | tr -d "\n"` , "=$$_ 0755 root root\n"' >prototype_dev_modules
 	pkgmk -oa `uname -m` -d $(PKGARCHIVE) -f prototype_dev
-	pkgtrans -s $(PKGARCHIVE) SVasterisk-dev-`uname -m`-`uname -r`.pkg SVasterisk
+	pkgtrans -s $(PKGARCHIVE) SVasterisk-dev-`cat .versionpkg`-$(PKGARCH)-`uname -r`.pkg SVasterisk
 	
-pkg: svnver all pkgdepend $(PKGARCHIVE) pkginfo
+pkg: svnver all svnverpkg pkgdepend $(PKGARCHIVE) pkginfo
 	pkgmk -oa `uname -m` -d $(PKGARCHIVE) -f prototype
-	pkgtrans -s $(PKGARCHIVE) SVasterisk-`uname -m`-`uname -r`.pkg SVasterisk
+	pkgtrans -s $(PKGARCHIVE) SVasterisk-`cat .versionpkg`-$(PKGARCH)-`uname -r`.pkg SVasterisk
 
 pkgdepend:
 	[ -f channels/chan_zap.so ] || ( echo "Package SVzaptel is required to build." && exit 1 )
@@ -472,6 +488,9 @@ pkginfo:
 
 svnver:
 	echo "asterisk-1.2.7.1-solvoip-`svn info | grep Revision | awk '{ print $$2 }'`" >.version
+
+svnverpkg:
+	echo "rev`svn info | grep Revision | awk '{ print $$2 }'`" >.versionpkg
 
 rhelsrc:
 	test -d /tmp/sv-rpm-src/asterisk-1.2.7.1 || mkdir -p /tmp/sv-rpm-src/asterisk-1.2.7.1
