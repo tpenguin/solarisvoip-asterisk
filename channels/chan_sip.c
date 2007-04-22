@@ -2287,13 +2287,14 @@ static int hangup_sip2cause(int cause)
 	switch(cause) {
 		case 603:	/* Declined */
 		case 403:	/* Not found */
+		case 487:	/* Call cancelled */
 			return AST_CAUSE_CALL_REJECTED;
 		case 404:	/* Not found */
 			return AST_CAUSE_UNALLOCATED;
 		case 408:	/* No reaction */
 			return AST_CAUSE_NO_USER_RESPONSE;
 		case 480:	/* No answer */
-			return AST_CAUSE_FAILURE;
+			return AST_CAUSE_NO_ANSWER;
 		case 483:	/* Too many hops */
 			return AST_CAUSE_NO_ANSWER;
 		case 486:	/* Busy everywhere */
@@ -2307,6 +2308,7 @@ static int hangup_sip2cause(int cause)
 		case 502:	
 			return AST_CAUSE_DESTINATION_OUT_OF_ORDER;
 		case 503:	/* Service unavailable */
+		case 504:	/* Server timeout */
 			return AST_CAUSE_CONGESTION;
 		default:
 			return AST_CAUSE_NORMAL;
