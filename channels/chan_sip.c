@@ -47,6 +47,9 @@
 #include <arpa/inet.h>
 #include <netinet/ip.h>
 #include <regex.h>
+#ifdef SOLARIS
+#include <thread.h>
+#endif
 
 #include "asterisk.h"
 
