@@ -437,7 +437,10 @@ static int spawn_mp3(struct mohclass *class)
 	/* Block signals during the fork() */
 	sigfillset(&signal_set);
 	pthread_sigmask(SIG_BLOCK, &signal_set, &old_set);
+
+#ifdef SOLARIS
 	sigignore(SIGCHLD);
+#endif
 
 	time(&class->start);
 #ifdef SOLARIS
