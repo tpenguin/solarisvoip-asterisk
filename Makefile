@@ -446,7 +446,9 @@ endif
 ISA	= $(shell uname -p)
 PROC	= $(shell uname -m)
 PKGARCHIVE = $(shell pwd)/$(shell uname -s)-$(shell uname -r).$(shell uname -m)
+ifeq ($(OSARCH),SunOS)
 ISABITS = $(shell isainfo -b)
+endif
 ifeq ($(ISABITS),64)
 	ifeq ($(ISA),i386)
 		PKGARCH=x64
