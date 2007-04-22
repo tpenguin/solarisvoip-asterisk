@@ -11198,6 +11198,9 @@ retrylock:
 			ast_mutex_unlock(&p->lock);
 			ast_mutex_unlock(&netlock);
 			/* Sleep infintismly short amount of time */
+#ifdef SOLARIS
+			thr_yield();
+#endif
 			usleep(1);
 			goto retrylock;
 		}
