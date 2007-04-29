@@ -1504,3 +1504,14 @@ const char * const	zone;
 	return(mktime_return_value);
 }
 
+#ifdef SOLARIS
+char *
+ast_gettzname(const char *name)
+{
+	struct state sp;
+	
+	tzload(name, &sp);
+
+	return strdup(sp.chars);
+}
+#endif

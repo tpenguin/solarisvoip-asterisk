@@ -1734,8 +1734,20 @@ static int sendmail(char *srcemail, struct ast_vm_user *vmu, int msgnum, char *c
 			ast_localtime(&t,&tm,the_zone->timezone);
 		else
 			ast_localtime(&t,&tm,NULL);
+#ifdef SOLARIS
+		if (the_zone) {
+			char *tz_name = ast_gettzname(the_zone->timezone);
+			strftime(date, sizeof(date), "%a, %d %b %Y %H:%M:%S", &tm);
+			fprintf(p, "Date: %s %s\n", date, tz_name);
+			free(tz_name);
+		} else {
+			strftime(date, sizeof(date), "%a, %d %b %Y %H:%M:%S %z", &tm);
+			fprintf(p, "Date: %s\n", date);
+		}
+#else
 		strftime(date, sizeof(date), "%a, %d %b %Y %H:%M:%S %z", &tm);
 		fprintf(p, "Date: %s\n", date);
+#endif
 
 		/* Set date format for voicemail mail */
 		strftime(date, sizeof(date), emaildateformat, &tm);
@@ -1908,9 +1920,20 @@ static int sendpage(char *srcemail, char *pager, int msgnum, char *context, char
 			ast_localtime(&t,&tm,the_zone->timezone);
 		else
 			ast_localtime(&t,&tm,NULL);
-
+#ifdef SOLARIS
+		if (the_zone) {
+			char *tz_name = ast_gettzname(the_zone->timezone);
+			strftime(date, sizeof(date), "%a, %d %b %Y %H:%M:%S", &tm);
+			fprintf(p, "Date: %s %s\n", date, tz_name);
+			free(tz_name);
+		} else {
+			strftime(date, sizeof(date), "%a, %d %b %Y %H:%M:%S %z", &tm);
+			fprintf(p, "Date: %s\n", date);
+		}
+#else
 		strftime(date, sizeof(date), "%a, %d %b %Y %H:%M:%S %z", &tm);
 		fprintf(p, "Date: %s\n", date);
+#endif
 
 		if (*pagerfromstring) {
 			struct ast_channel *ast = ast_channel_alloc(0);

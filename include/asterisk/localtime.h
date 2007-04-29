@@ -30,5 +30,5 @@ extern struct tm *ast_localtime(const time_t *timep, struct tm *p_tm, const char
 extern time_t ast_mktime(struct tm * const tmp, const char *zone);
 extern char *ast_ctime(const time_t * const timep);
 extern char *ast_ctime_r(const time_t * const timep, char *buf);
-
+extern char *ast_gettzname(const char *name);
 #endif /* _ASTERISK_LOCALTIME_H */
