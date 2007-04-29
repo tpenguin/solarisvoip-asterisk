@@ -11002,16 +11002,17 @@ static int handle_request(struct sip_pvt *p, struct sip_request *req, struct soc
 			/* ignore means "don't do anything with it" but still have to 
 			   respond appropriately  */
 			ignore=1;
-		}
-	
-		e = ast_skip_blanks(e);
-		if (sscanf(e, "%d %n", &respid, &len) != 1) {
-			ast_log(LOG_WARNING, "Invalid response: '%s'\n", e);
-		} else {
-			/* More SIP ridiculousness, we have to ignore bogus contacts in 100 etc responses */
-			if ((respid == 200) || ((respid >= 300) && (respid <= 399)))
-				extract_uri(p, req);
-			handle_response(p, respid, e + len, req, ignore, seqno);
+		} else if (e) {
+			e = ast_skip_blanks(e);
+			if (sscanf(e, "%d %n", &respid, &len) != 1) {
+				ast_log(LOG_WARNING, "Invalid response: '%s'\n", e);
+			} else {
+				/* More SIP ridiculousness, we have to ignore bogus contacts in 100 etc responses */
+				if ((respid == 200) || ((respid >= 300) && (respid <= 399)))
+					extract_uri(p, req);
+				handle_response(p, respid, e + len, req, ignore,
+ seqno);
+			}
 		}
 		return 0;
 	}
@@ -12314,9 +12315,9 @@ static struct sip_peer *build_peer(const char *name, struct ast_variable *v, int
 				peer->maxms = 0;
 			}
 		}
-		/* else if (strcasecmp(v->name,"type"))
-		 *	ast_log(LOG_WARNING, "Ignoring %s\n", v->name);
-		 */
+		/* We can't just report unknown options here because this may be a
+		 * type=friend entry.  All user options are valid for a peer, but not
+		 * the other way around.  */
 		v=v->next;
 	}
 	if (!ast_test_flag((&global_flags_page2), SIP_PAGE2_IGNOREREGEXPIRE) && ast_test_flag(peer, SIP_DYNAMIC) && realtime) {
