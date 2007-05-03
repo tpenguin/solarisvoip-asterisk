@@ -543,8 +543,8 @@ static void *monmp3thread(void *data)
 				 * much a more accurate timer. 
 				 */
 				struct timespec rqtp;
-				rqtp.tv_sec = (MOH_MS_INTERVAL - delta) / (unsigned long) 1000000;
-				rqtp.tv_nsec = ((MOH_MS_INTERVAL - delta) % (unsigned long) 1000000) * 1000;
+				rqtp.tv_sec = ((MOH_MS_INTERVAL - delta) * 1000) / (unsigned long) 1000000;
+				rqtp.tv_nsec = (((MOH_MS_INTERVAL - delta) * 1000) % (unsigned long) 1000000) * 1000;
 				
 				if (nanosleep(&rqtp, (struct timespec *) NULL) == -1) {
 					ast_log(LOG_NOTICE, "Nanosleep timer errored.\n");
