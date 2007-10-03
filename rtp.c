@@ -1179,6 +1179,11 @@ int ast_rtp_senddigit(struct ast_rtp *rtp, char digit)
 					ast_verbose("Sent RTP packet to %s:%d (type %d, seq %u, ts %u, len %u)\n",
 								ast_inet_ntoa(iabuf, sizeof(iabuf), rtp->them.sin_addr),
 								ntohs(rtp->them.sin_port), payload, rtp->seqno, rtp->lastdigitts, res - hdrlen);
+				struct timespec req = { 0 };
+				req.tv_sec = 0;
+				req.tv_nsec = 20 * 1000000L;
+				while (nanosleep(&req, &req) == -1)
+					continue;
 			}
 		}
 
