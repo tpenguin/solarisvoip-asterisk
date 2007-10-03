@@ -32,7 +32,7 @@ noload => pbx_kdeconsole.so
 noload => app_intercom.so
 ;
 ; iSP Services CNAM lookup
-noload => app_lookupname.so
+noload => app_lookupcname.so
 ;
 ; Curl
 noload => app_curl.so
