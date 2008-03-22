@@ -646,13 +646,6 @@ static int conf_cmd(int fd, int argc, char **argv) {
 		AST_LIST_TRAVERSE(&confs, cnf, list) {
 			if (strcmp(cnf->confno, argv[2]) == 0)
 				break;
-			if (cnf->next) {
-				cnf = cnf->next;	
-			} else {
-				if ( !concise )
-				    ast_cli(fd, "No such conference: %s.\n",argv[2]);
-				return RESULT_SUCCESS;
-			}
 		}
 		if (!cnf) {
 			ast_cli(fd, "No such conference: %s.\n", argv[2]);
@@ -660,35 +653,18 @@ static int conf_cmd(int fd, int argc, char **argv) {
 			return RESULT_SUCCESS;
 		}
 		/* Show all the users */
-		for (user = cnf->firstuser; user; user = user->nextuser) {
-			now = time(NULL);
-			hr = (now - user->jointime) / 3600;
-			min = ((now - user->jointime) % 3600) / 60;
-			sec = (now - user->jointime) % 60;
-			// ast_log(LOG_WARNING, "list concise=%d\n", concise);
-			if ( !concise ) {
-			    ast_cli(fd, "User #: %-2.2d %12.12s %-20.20s Channel: %s %s %s %s %s %02d:%02d:%02d\n",
-				    user->user_no,
-				    user->chan->cid.cid_num ? user->chan->cid.cid_num : "<unknown>",
-				    user->chan->cid.cid_name ? user->chan->cid.cid_name : "<no name>",
-				    user->chan->name,
-				    user->userflags & CONFFLAG_ADMIN ? "(Admin)" : "",
-				    user->userflags & CONFFLAG_MONITOR ? "(Listen only)" : "",
-				    user->adminflags & ADMINFLAG_MUTED ? "(Admn Muted)" : "",
-				    istalking(user->talking), hr, min, sec);
-			    ast_cli(fd,"%d users in that conference.\n",cnf->users);
-			} else {
-		  	    ast_cli(fd, "%d!%s!%s!%s!%s!%s!%s!%d!%02d:%02d:%02d\n",
-					user->user_no,
-				        user->chan->cid.cid_num ? user->chan->cid.cid_num : "",
-				        user->chan->cid.cid_name ? user->chan->cid.cid_name : "",
-					user->chan->name,
-					user->userflags  & CONFFLAG_ADMIN   ? "1" : "",
-					user->userflags  & CONFFLAG_MONITOR ? "1" : "",
-					user->adminflags & (ADMINFLAG_MUTED)  ? "1" : "",
-					user->talking, hr, min, sec);
-			}
+		AST_LIST_TRAVERSE(&cnf->userlist, user, list) {
+			ast_cli(fd, "User #: %-2.2d %12.12s %-20.20s Channel: %s %s %s %s %s\n",
+				user->user_no,
+				user->chan->cid.cid_num ? user->chan->cid.cid_num : "<unknown>",
+				user->chan->cid.cid_name ? user->chan->cid.cid_name : "<no name>",
+				user->chan->name,
+				user->userflags & CONFFLAG_ADMIN ? "(Admin)" : "",
+				user->userflags & CONFFLAG_MONITOR ? "(Listen only)" : "",
+				user->adminflags & ADMINFLAG_MUTED ? "(Admin Muted)" : "",
+				istalking(user->talking));
 		}
+		ast_cli(fd,"%d users in that conference.\n",cnf->users);
 		AST_LIST_UNLOCK(&confs);
 
 		return RESULT_SUCCESS;
@@ -1397,8 +1373,8 @@ static int conf_run(struct ast_channel *chan, struct ast_conference *conf, int c
 		         
 		         /* Restore musiconhold */
 		         if (musiconhold && (confflags & CONFFLAG_MOH) && 
-		             ((confflags & CONFFLAG_WAITMARKED) && currentmarked == 0)
-		             || (!(confflags & CONFFLAG_WAITMARKED) && conf->users == 1) ) {
+		             (((confflags & CONFFLAG_WAITMARKED) && currentmarked == 0)
+		             || (!(confflags & CONFFLAG_WAITMARKED) && conf->users == 1)) ) {
 						ast_moh_start(user->chan, NULL);
 					}
 		      } else {
@@ -2293,14 +2269,8 @@ static int admin_exec(struct ast_channel *chan, void *data) {
 				}
 				break;
 			case 82: /* R: reset all volume levels */
-				user = cnf->firstuser;
-				while(user) {
+				AST_LIST_TRAVERSE(&cnf->userlist, user, list) {
 					reset_volumes(user);
-					if (user->nextuser) {
-						user = user->nextuser;
-					} else {
-						break;
-					}
 				}
 				break;
 			}
@@ -2343,23 +2313,25 @@ static int meetmemute(struct mansession *s, struct message *m, int mute)
 	}
 
 	/* Look in the conference list */
-	ast_mutex_lock(&conflock);
-	for (conf = confs; conf; conf = conf->next)
+	AST_LIST_LOCK(&confs);
+	AST_LIST_TRAVERSE(&confs, conf, list) {
 		if (!strcmp(confid, conf->confno))
 			break;
+	}
 
 	if (!conf) {
-		ast_mutex_unlock(&conflock);
+		AST_LIST_UNLOCK(&confs);
 		astman_send_error(s, m, "Meetme conference does not exist");
 		return 0;
 	}
 
-	for (user = conf->firstuser; user; user = user->nextuser)
+	AST_LIST_TRAVERSE(&conf->userlist, user, list) {
 		if (user->user_no == userno)
 			break;
+	}
 
 	if (!user) {
-		ast_mutex_unlock(&conflock);
+		AST_LIST_UNLOCK(&confs);
 		astman_send_error(s, m, "User number not found");
 		return 0;
 	}
@@ -2369,7 +2341,7 @@ static int meetmemute(struct mansession *s, struct message *m, int mute)
 	else
 		user->adminflags &= ~ADMINFLAG_MUTED;	/* request user unmuting */
 
-	ast_mutex_unlock(&conflock);
+	AST_LIST_UNLOCK(&confs);
 
 	ast_log(LOG_NOTICE, "Requested to %smute conf %s user %d userchan %s uniqueid %s\n", mute ? "" : "un", conf->confno, user->user_no, user->chan->name, user->chan->uniqueid);
 
@@ -2419,23 +2391,25 @@ static int action_meetmewhisper(struct mansession *s, struct message *m)
 	}
 
 	/* Look in the conference list */
-	ast_mutex_lock(&conflock);
-	for (conf = confs; conf; conf = conf->next)
+	AST_LIST_LOCK(&confs);
+	AST_LIST_TRAVERSE(&confs, conf, list) {
 		if (!strcmp(confid, conf->confno))
 			break;
+	}
 
 	if (!conf) {
-		ast_mutex_unlock(&conflock);
+		AST_LIST_UNLOCK(&confs);
 		astman_send_error(s, m, "Meetme conference does not exist");
 		return 0;
 	}
 
-	for (user = conf->firstuser; user; user = user->nextuser)
+	AST_LIST_TRAVERSE(&conf->userlist, user, list) {
 		if (user->user_no == userno)
 			break;
+	}
 
 	if (!user) {
-		ast_mutex_unlock(&conflock);
+		AST_LIST_UNLOCK(&confs);
 		astman_send_error(s, m, "User number not found");
 		return 0;
 	}
@@ -2443,7 +2417,7 @@ static int action_meetmewhisper(struct mansession *s, struct message *m)
 	strcpy(user->whisperfile, message);
 
    user->adminflags |= ADMINFLAG_WHISPER;	/* request user whisper, disconnect from rest of conference stream to prevent mixing */
-	ast_mutex_unlock(&conflock);
+	AST_LIST_UNLOCK(&confs);
 
 	ast_log(LOG_NOTICE, "Requested to whisper conf %s user %d userchan %s uniqueid %s\n", conf->confno, user->user_no, user->chan->name, user->chan->uniqueid);
 

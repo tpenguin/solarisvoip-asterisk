@@ -39,7 +39,9 @@ ASTERISK_FILE_VERSION(__FILE__, "$Revision: 62173 $")
 #include <sys/ioctl.h>
 #include <errno.h>
 #include <sys/mman.h>
+#ifndef SOLARIS
 #include <linux/zaptel.h>
+#endif
 
 #include "asterisk/lock.h"
 #include "asterisk/translate.h"

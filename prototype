@@ -101,7 +101,6 @@ f none opt/asterisk/lib/modules/codec_ulaw.so=codecs/codec_ulaw.so 0755 root roo
 f none opt/asterisk/lib/modules/codec_alaw.so=codecs/codec_alaw.so 0755 root root
 f none opt/asterisk/lib/modules/codec_a_mu.so=codecs/codec_a_mu.so 0755 root root
 f none opt/asterisk/lib/modules/codec_g726.so=codecs/codec_g726.so 0755 root root
-f none opt/asterisk/lib/modules/codec_zap.so=codecs/codec_zap.so 0755 root root
 f none opt/asterisk/lib/modules/format_gsm.so=formats/format_gsm.so 0755 root root
 f none opt/asterisk/lib/modules/format_wav.so=formats/format_wav.so 0755 root root
 f none opt/asterisk/lib/modules/format_wav_gsm.so=formats/format_wav_gsm.so 0755 root root

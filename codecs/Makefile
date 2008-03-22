@@ -36,7 +36,9 @@ ifneq ($(wildcard $(CROSS_COMPILE_TARGET)/usr/include/linux/zaptel.h)$(wildcard 
   ifeq (${OSARCH},FreeBSD)
     SOLINK+=-L$(CROSS_COMPILE_TARGET)/usr/local/lib
   endif
-  CODECS+=codec_zap.so
+  ifneq (${OSARCH},SunOS)
+    CODECS+=codec_zap.so
+  endif
 endif
 endif # WITHOUT_ZAPTEL
 
