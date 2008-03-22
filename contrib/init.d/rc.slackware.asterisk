@@ -6,6 +6,7 @@
 #
 # 03.29.2005 - Initial Version
 #
+# $Id: rc.slackware.asterisk 67060 2007-06-04 17:10:30Z tilghman $
 
 asterisk_start() {
    if [ -x /usr/sbin/asterisk ]; then

@@ -31,10 +31,11 @@
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
+#include <signal.h>
 
 #include "asterisk.h"
 
-ASTERISK_FILE_VERSION(__FILE__, "$Revision: 7634 $")
+ASTERISK_FILE_VERSION(__FILE__, "$Revision: 48394 $")
 
 #include "asterisk/lock.h"
 #include "asterisk/file.h"
@@ -44,6 +45,7 @@ ASTERISK_FILE_VERSION(__FILE__, "$Revision: 7634 $")
 #include "asterisk/module.h"
 #include "asterisk/linkedlists.h"
 #include "asterisk/app.h"
+#include "asterisk/options.h"
 
 static const char *tdesc = "External IVR Interface Application";
 
@@ -151,7 +153,7 @@ static int gen_nextfile(struct gen_state *state)
 		if (state->current) {
 			file_to_stream = state->current->filename;
 		} else {
-			file_to_stream = "silence-10";
+			file_to_stream = "silence/10";
 			u->playing_silence = 1;
 		}
 
@@ -257,9 +259,13 @@ static int app_exec(struct ast_channel *chan, void *data)
 	FILE *child_commands = NULL;
 	FILE *child_errors = NULL;
 	FILE *child_events = NULL;
+	sigset_t fullset, oldset;
 
 	LOCAL_USER_ADD(u);
-	
+
+	sigfillset(&fullset);
+	pthread_sigmask(SIG_BLOCK, &fullset, &oldset);
+
 	AST_LIST_HEAD_INIT(&u->playlist);
 	AST_LIST_HEAD_INIT(&u->finishlist);
 	u->abort_current_sound = 0;
@@ -313,6 +319,12 @@ static int app_exec(struct ast_channel *chan, void *data)
 		/* child process */
 		int i;
 
+		signal(SIGPIPE, SIG_DFL);
+		pthread_sigmask(SIG_UNBLOCK, &fullset, NULL);
+
+		if (option_highpriority)
+			ast_set_priority(0);
+
 		dup2(child_stdin[0], STDIN_FILENO);
 		dup2(child_stdout[1], STDOUT_FILENO);
 		dup2(child_stderr[1], STDERR_FILENO);
@@ -320,7 +332,7 @@ static int app_exec(struct ast_channel *chan, void *data)
 			close(i);
 		execv(argv[0], argv);
 		fprintf(stderr, "Failed to execute '%s': %s\n", argv[0], strerror(errno));
-		exit(1);
+		_exit(1);
 	} else {
 		/* parent process */
 		int child_events_fd = child_stdin[1];
@@ -332,6 +344,8 @@ static int app_exec(struct ast_channel *chan, void *data)
 		int ready_fd;
 		int waitfds[2] = { child_errors_fd, child_commands_fd };
 		struct ast_channel *rchan;
+
+		pthread_sigmask(SIG_SETMASK, &oldset, NULL);
 
 		close(child_stdin[0]);
 		child_stdin[0] = 0;
@@ -443,7 +457,7 @@ static int app_exec(struct ast_channel *chan, void *data)
 					continue;
 
 				if (input[0] == 'S') {
-					if (ast_fileexists(&input[2], NULL, NULL) == -1) {
+					if (ast_fileexists(&input[2], NULL, u->chan->language) == -1) {
 						ast_chan_log(LOG_WARNING, chan, "Unknown file requested '%s'\n", &input[2]);
 						send_child_event(child_events, 'Z', NULL, chan);
 						strcpy(&input[2], "exception");
@@ -462,7 +476,7 @@ static int app_exec(struct ast_channel *chan, void *data)
 						AST_LIST_INSERT_TAIL(&u->playlist, entry, list);
 					AST_LIST_UNLOCK(&u->playlist);
 				} else if (input[0] == 'A') {
-					if (ast_fileexists(&input[2], NULL, NULL) == -1) {
+					if (ast_fileexists(&input[2], NULL, u->chan->language) == -1) {
 						ast_chan_log(LOG_WARNING, chan, "Unknown file requested '%s'\n", &input[2]);
 						send_child_event(child_events, 'Z', NULL, chan);
 						strcpy(&input[2], "exception");

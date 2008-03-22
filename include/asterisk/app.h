@@ -130,6 +130,8 @@ int ast_control_streamfile(struct ast_channel *chan, const char *file, const cha
 /*! Play a stream and wait for a digit, returning the digit that was pressed */
 int ast_play_and_wait(struct ast_channel *chan, const char *fn);
 
+int ast_play_and_record_full(struct ast_channel *chan, const char *playfile, const char *recordfile, int maxtime_sec, const char *fmt, int *duration, int silencethreshold, int maxsilence_ms, const char *path, const char *acceptdtmf, const char *canceldtmf);
+
 /*! Record a file for a max amount of time (in seconds), in a given list of formats separated by '|', outputting the duration of the recording, and with a maximum 
  \n
  permitted silence time in milliseconds of 'maxsilence' under 'silencethreshold' or use '-1' for either or both parameters for defaults. 
@@ -164,7 +166,12 @@ int ast_unlock_path(const char *path);
 /*! Read a file into asterisk*/
 char *ast_read_textfile(const char *file);
 
-#define GROUP_CATEGORY_PREFIX "GROUP"
+struct ast_group_info {
+	struct ast_channel *chan;
+	char *category;
+	char *group;
+	AST_LIST_ENTRY(ast_group_info) list;
+};
 
 /*! Split a group string into group and category, returning a default category if none is provided. */
 int ast_app_group_split_group(char *data, char *group, int group_max, char *category, int category_max);
@@ -177,6 +184,21 @@ int ast_app_group_get_count(char *group, char *category);
 
 /*! Get the current channel count of all groups that match the specified pattern and category. */
 int ast_app_group_match_get_count(char *groupmatch, char *category);
+
+/*! Discard all group counting for a channel */
+int ast_app_group_discard(struct ast_channel *chan);
+
+/*! Update all group counting for a channel to a new one */
+int ast_app_group_update(struct ast_channel *oldchan, struct ast_channel *newchan);
+
+/*! Lock the group count list */
+int ast_app_group_list_lock(void);
+
+/*! Get the head of the group count list */
+struct ast_group_info *ast_app_group_list_head(void);
+
+/*! Unlock the group count list */
+int ast_app_group_list_unlock(void);
 
 /*!
   \brief Define an application argument

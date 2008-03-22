@@ -31,7 +31,7 @@
 
 #include "asterisk.h"
 
-ASTERISK_FILE_VERSION(__FILE__, "$Revision: 7221 $")
+ASTERISK_FILE_VERSION(__FILE__, "$Revision: 44168 $")
 
 #include "asterisk/io.h"
 #include "asterisk/logger.h"
@@ -247,7 +247,7 @@ int ast_io_remove(struct io_context *ioc, int *_id)
 			ioc->fds[x].events = 0;
 			ioc->fds[x].revents = 0;
 			ioc->needshrink = 1;
-			if (!ioc->current_ioc)
+			if (ioc->current_ioc == -1)
 				io_shrink(ioc);
 			return 0;
 		}

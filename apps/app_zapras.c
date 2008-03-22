@@ -48,7 +48,7 @@
 
 #include "asterisk.h"
 
-ASTERISK_FILE_VERSION(__FILE__, "$Revision: 7221 $")
+ASTERISK_FILE_VERSION(__FILE__, "$Revision: 48374 $")
 
 #include "asterisk/lock.h"
 #include "asterisk/file.h"
@@ -87,22 +87,34 @@ static pid_t spawn_ras(struct ast_channel *chan, char *args)
 	char *argv[PPP_MAX_ARGS];
 	int argc = 0;
 	char *stringp=NULL;
+	sigset_t fullset, oldset;
+
+	sigfillset(&fullset);
+	pthread_sigmask(SIG_BLOCK, &fullset, &oldset);
 
 	/* Start by forking */
 	pid = fork();
-	if (pid)
+	if (pid) {
+		pthread_sigmask(SIG_SETMASK, &oldset, NULL);
 		return pid;
-
-	/* Execute RAS on File handles */
-	dup2(chan->fds[0], STDIN_FILENO);
-
-	/* Close other file descriptors */
-	for (x=STDERR_FILENO + 1;x<1024;x++) 
-		close(x);
+	}
 
 	/* Restore original signal handlers */
 	for (x=0;x<NSIG;x++)
 		signal(x, SIG_DFL);
+
+	pthread_sigmask(SIG_UNBLOCK, &fullset, NULL);
+
+	/* Execute RAS on File handles */
+	dup2(chan->fds[0], STDIN_FILENO);
+
+	/* Drop high priority */
+	if (option_highpriority)
+		ast_set_priority(0);
+
+	/* Close other file descriptors */
+	for (x=STDERR_FILENO + 1;x<1024;x++) 
+		close(x);
 
 	/* Reset all arguments */
 	memset(argv, 0, sizeof(argv));
@@ -123,12 +135,6 @@ static pid_t spawn_ras(struct ast_channel *chan, char *args)
 	argv[argc++] = "plugin";
 	argv[argc++] = "zaptel.so";
 	argv[argc++] = "stdin";
-
-#if 0
-	for (x=0;x<argc;x++) {
-		fprintf(stderr, "Arg %d: %s\n", x, argv[x]);
-	}
-#endif
 
 	/* Finally launch PPP */
 	execv(PPP_EXEC, argv);

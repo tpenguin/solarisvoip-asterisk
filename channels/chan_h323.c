@@ -57,7 +57,7 @@ extern "C" {
 
 #include "asterisk.h"
 
-ASTERISK_FILE_VERSION(__FILE__, "$Revision: 7221 $")
+ASTERISK_FILE_VERSION(__FILE__, "$Revision: 53045 $")
 
 #include "asterisk/lock.h"
 #include "asterisk/logger.h"
@@ -769,16 +769,14 @@ static struct ast_channel *__oh323_new(struct oh323_pvt *pvt, int state, const c
 		if (pvt->amaflags) {
 			ch->amaflags = pvt->amaflags;
 		}
-		if (!ast_strlen_zero(pvt->cid_num)) {
+
+		if (!ast_strlen_zero(pvt->cid_num))
 			ch->cid.cid_num = strdup(pvt->cid_num);
-		} else if (!ast_strlen_zero(pvt->cd.call_source_e164)) {
+		else if (!ast_strlen_zero(pvt->cd.call_source_e164))
 			ch->cid.cid_num = strdup(pvt->cd.call_source_e164);
-		}
-		if (!ast_strlen_zero(pvt->cid_name)) {
+		if (!ast_strlen_zero(pvt->cid_name))
 			ch->cid.cid_name = strdup(pvt->cid_name);
-		} else if (!ast_strlen_zero(pvt->cd.call_source_name)) {
-			ch->cid.cid_name = strdup(pvt->cd.call_source_name);
-		}
+
 		if (!ast_strlen_zero(pvt->rdnis)) {
 			ch->cid.cid_rdnis = strdup(pvt->rdnis);
 		}
@@ -1233,7 +1231,6 @@ void setup_rtp_connection(unsigned call_reference, const char *remoteIp, int rem
   */
 void connection_made(unsigned call_reference, const char *token)
 {
-	struct ast_channel *c = NULL;
 	struct oh323_pvt *pvt;
 
 	if (h323debug)
@@ -1435,7 +1432,6 @@ int setup_outgoing_call(call_details_t *cd)
   */
 void chan_ringing(unsigned call_reference, const char *token)
 {
-	struct ast_channel *c = NULL;
 	struct oh323_pvt *pvt;
 
 	if (h323debug)
@@ -1646,9 +1642,11 @@ static int restart_monitor(void)
                 /* Start a new monitor */
                 if (ast_pthread_create(&monitor_thread, &attr, do_monitor, NULL) < 0) {
                         ast_mutex_unlock(&monlock);
+						pthread_attr_destroy(&attr);
                         ast_log(LOG_ERROR, "Unable to start monitor thread.\n");
                         return -1;
                 }
+		pthread_attr_destroy(&attr);
 
 	}
 	ast_mutex_unlock(&monlock);
@@ -2025,7 +2023,7 @@ int reload_config(void)
 	memset(&global_options, 0, sizeof(global_options));
 	global_options.dtmfcodec = 101;
 	global_options.dtmfmode = H323_DTMF_RFC2833;
-	global_options.capability = ~0;	/* All capabilities */
+	global_options.capability = AST_FORMAT_G723_1 | AST_FORMAT_GSM | AST_FORMAT_ULAW | AST_FORMAT_ALAW | AST_FORMAT_G729A | AST_FORMAT_H261;
 	global_options.bridge = 1;		/* Do native bridging by default */
 	v = ast_variable_browse(cfg, "general");
 	while(v) {
@@ -2281,7 +2279,7 @@ static char *convertcap(int cap)
 	}
 }
 
-static int oh323_set_rtp_peer(struct ast_channel *chan, struct ast_rtp *rtp, struct ast_rtp *vrtp, int codecs)
+static int oh323_set_rtp_peer(struct ast_channel *chan, struct ast_rtp *rtp, struct ast_rtp *vrtp, int codecs, int nat_active)
 {
 	/* XXX Deal with Video */
 	struct oh323_pvt *pvt;
@@ -2310,7 +2308,7 @@ static struct ast_rtp_protocol oh323_rtp = {
 	.type = type,
 	.get_rtp_info = oh323_get_rtp_peer,
 	.get_vrtp_info = oh323_get_vrtp_peer,
-	.set_rtp_peer=  oh323_set_rtp_peer,
+	.set_rtp_peer = oh323_set_rtp_peer,
 };
 
 int load_module()

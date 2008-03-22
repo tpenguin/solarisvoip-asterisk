@@ -50,7 +50,7 @@
 
 #include "asterisk.h"
 
-ASTERISK_FILE_VERSION(__FILE__, "$Revision: 9232 $")
+ASTERISK_FILE_VERSION(__FILE__, "$Revision: 36998 $")
 
 #include "asterisk/lock.h"
 #include "asterisk/frame.h"
@@ -1147,7 +1147,7 @@ static int console_dial(int fd, int argc, char *argv[])
 
 static char dial_usage[] =
 "Usage: dial [extension[@context]]\n"
-"       Dials a given extensison (and context if specified)\n";
+"       Dials a given extension (and context if specified)\n";
 
 static char mute_usage[] =
 "Usage: mute\nMutes the microphone\n";

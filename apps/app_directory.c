@@ -30,7 +30,7 @@
 
 #include "asterisk.h"
 
-ASTERISK_FILE_VERSION(__FILE__, "$Revision: 7221 $")
+ASTERISK_FILE_VERSION(__FILE__, "$Revision: 63565 $")
 
 #include "asterisk/lock.h"
 #include "asterisk/file.h"
@@ -42,6 +42,16 @@ ASTERISK_FILE_VERSION(__FILE__, "$Revision: 7221 $")
 #include "asterisk/say.h"
 #include "asterisk/utils.h"
 
+#ifdef USE_ODBC_STORAGE
+#include <errno.h>
+#include <sys/mman.h>
+#include "asterisk/res_odbc.h"
+
+static char odbc_database[80] = "asterisk";
+static char odbc_table[80] = "voicemessages";
+static char vmfmts[80] = "wav";
+#endif
+
 static char *tdesc = "Extension Directory";
 static char *app = "Directory";
 
@@ -51,7 +61,7 @@ static char *descrip =
 "the calling channel with a directory of extensions from which they can search\n"
 "by name. The list of names and corresponding extensions is retrieved from the\n"
 "voicemail configuration file, voicemail.conf.\n"
-"  This applicaiton will immediate exit if one of the following DTMF digits are\n"
+"  This application will immediately exit if one of the following DTMF digits are\n"
 "received and the extension to jump to exists:\n"
 "    0 - Jump to the 'o' extension, if it exists.\n"
 "    * - Jump to the 'a' extension, if it exists.\n\n"
@@ -76,6 +86,101 @@ static char *descrip =
 STANDARD_LOCAL_USER;
 
 LOCAL_USER_DECL;
+
+#ifdef USE_ODBC_STORAGE
+static void retrieve_file(char *dir)
+{
+	int x = 0;
+	int res;
+	int fd=-1;
+	size_t fdlen = 0;
+	void *fdm = MAP_FAILED;
+	SQLHSTMT stmt;
+	char sql[256];
+	char fmt[80]="", empty[10] = "";
+	char *c;
+	SQLLEN colsize;
+	char full_fn[256];
+
+	odbc_obj *obj;
+	obj = fetch_odbc_obj(odbc_database, 0);
+	if (obj) {
+		do {
+			ast_copy_string(fmt, vmfmts, sizeof(fmt));
+			c = strchr(fmt, '|');
+			if (c)
+				*c = '\0';
+			if (!strcasecmp(fmt, "wav49"))
+				strcpy(fmt, "WAV");
+			snprintf(full_fn, sizeof(full_fn), "%s.%s", dir, fmt);
+			res = SQLAllocHandle(SQL_HANDLE_STMT, obj->con, &stmt);
+			if ((res != SQL_SUCCESS) && (res != SQL_SUCCESS_WITH_INFO)) {
+				ast_log(LOG_WARNING, "SQL Alloc Handle failed!\n");
+				break;
+			}
+			snprintf(sql, sizeof(sql), "SELECT recording FROM %s WHERE dir=? AND msgnum=-1", odbc_table);
+			res = SQLPrepare(stmt, (unsigned char *)sql, SQL_NTS);
+			if ((res != SQL_SUCCESS) && (res != SQL_SUCCESS_WITH_INFO)) {
+				ast_log(LOG_WARNING, "SQL Prepare failed![%s]\n", sql);
+				SQLFreeHandle(SQL_HANDLE_STMT, stmt);
+				break;
+			}
+			SQLBindParameter(stmt, 1, SQL_PARAM_INPUT, SQL_C_CHAR, SQL_CHAR, strlen(dir), 0, (void *)dir, 0, NULL);
+			res = odbc_smart_execute(obj, stmt);
+			if ((res != SQL_SUCCESS) && (res != SQL_SUCCESS_WITH_INFO)) {
+				ast_log(LOG_WARNING, "SQL Execute error!\n[%s]\n\n", sql);
+				SQLFreeHandle(SQL_HANDLE_STMT, stmt);
+				break;
+			}
+			res = SQLFetch(stmt);
+			if (res == SQL_NO_DATA) {
+				SQLFreeHandle(SQL_HANDLE_STMT, stmt);
+				break;
+			} else if ((res != SQL_SUCCESS) && (res != SQL_SUCCESS_WITH_INFO)) {
+				ast_log(LOG_WARNING, "SQL Fetch error!\n[%s]\n\n", sql);
+				SQLFreeHandle(SQL_HANDLE_STMT, stmt);
+				break;
+			}
+			fd = open(full_fn, O_RDWR | O_CREAT | O_TRUNC, 0770);
+			if (fd < 0) {
+				ast_log(LOG_WARNING, "Failed to write '%s': %s\n", full_fn, strerror(errno));
+				SQLFreeHandle(SQL_HANDLE_STMT, stmt);
+				break;
+			}
+
+			res = SQLGetData(stmt, 1, SQL_BINARY, empty, 0, &colsize);
+			fdlen = colsize;
+			if (fd > -1) {
+				char tmp[1]="";
+				lseek(fd, fdlen - 1, SEEK_SET);
+				if (write(fd, tmp, 1) != 1) {
+					close(fd);
+					fd = -1;
+					break;
+				}
+				if (fd > -1)
+					fdm = mmap(NULL, fdlen, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+			}
+			if (fdm != MAP_FAILED) {
+				memset(fdm, 0, fdlen);
+				res = SQLGetData(stmt, x + 1, SQL_BINARY, fdm, fdlen, &colsize);
+				if ((res != SQL_SUCCESS) && (res != SQL_SUCCESS_WITH_INFO)) {
+					ast_log(LOG_WARNING, "SQL Get Data error!\n[%s]\n\n", sql);
+					SQLFreeHandle(SQL_HANDLE_STMT, stmt);
+					break;
+				}
+			}
+			SQLFreeHandle(SQL_HANDLE_STMT, stmt);
+		} while (0);
+	} else
+		ast_log(LOG_WARNING, "Failed to obtain database object for '%s'!\n", odbc_database);
+	if (fdm != MAP_FAILED)
+		munmap(fdm, fdlen);
+	if (fd > -1)
+		close(fd);
+	return;
+}
+#endif
 
 static char *convert(char *lastname)
 {
@@ -151,7 +256,7 @@ static char *convert(char *lastname)
  *           '1' for selected entry from directory
  *           '*' for skipped entry from directory
  */
-static int play_mailbox_owner(struct ast_channel *chan, char *context, char *dialcontext, char *ext, char *name) {
+static int play_mailbox_owner(struct ast_channel *chan, char *context, char *dialcontext, char *ext, char *name, int fromappvm) {
 	int res = 0;
 	int loop = 3;
 	char fn[256];
@@ -160,10 +265,16 @@ static int play_mailbox_owner(struct ast_channel *chan, char *context, char *dia
 	/* Check for the VoiceMail2 greeting first */
 	snprintf(fn, sizeof(fn), "%s/voicemail/%s/%s/greet",
 		(char *)ast_config_AST_SPOOL_DIR, context, ext);
+#ifdef USE_ODBC_STORAGE
+	retrieve_file(fn);
+#endif
 
 	/* Otherwise, check for an old-style Voicemail greeting */
 	snprintf(fn2, sizeof(fn2), "%s/vm/%s/greet",
 		(char *)ast_config_AST_SPOOL_DIR, ext);
+#ifdef USE_ODBC_STORAGE
+	retrieve_file(fn2);
+#endif
 
 	if (ast_fileexists(fn, NULL, chan->language) > 0) {
 		res = ast_streamfile(chan, fn, chan->language);
@@ -181,6 +292,10 @@ static int play_mailbox_owner(struct ast_channel *chan, char *context, char *dia
 		res = ast_say_character_str(chan, !ast_strlen_zero(name) ? name : ext,
 					AST_DIGIT_ANY, chan->language);
 	}
+#ifdef USE_ODBC_STORAGE
+	ast_filedelete(fn, NULL);	
+	ast_filedelete(fn2, NULL);	
+#endif
 
 	while (loop) {
 		if (!res) {
@@ -199,12 +314,17 @@ static int play_mailbox_owner(struct ast_channel *chan, char *context, char *dia
 				case '1':
 					/* Name selected */
 					loop = 0;
-					if (ast_goto_if_exists(chan, dialcontext, ext, 1)) {
-						ast_log(LOG_WARNING,
-							"Can't find extension '%s' in context '%s'.  "
-							"Did you pass the wrong context to Directory?\n",
-							ext, dialcontext);
-						res = -1;
+					if (fromappvm) {
+						/* We still want to set the exten */
+						ast_copy_string(chan->exten, ext, sizeof(chan->exten));
+					} else {
+						if (ast_goto_if_exists(chan, dialcontext, ext, 1)) {
+							ast_log(LOG_WARNING,
+								"Can't find extension '%s' in context '%s'.  "
+								"Did you pass the wrong context to Directory?\n",
+								ext, dialcontext);
+							res = -1;
+						}
 					}
 					break;
 	
@@ -288,7 +408,7 @@ static struct ast_config *realtime_directory(char *context)
 	return cfg;
 }
 
-static int do_directory(struct ast_channel *chan, struct ast_config *cfg, char *context, char *dialcontext, char digit, int last)
+static int do_directory(struct ast_channel *chan, struct ast_config *cfg, char *context, char *dialcontext, char digit, int last, int fromappvm)
 {
 	/* Read in the first three digits..  "digit" is the first digit, already read */
 	char ext[NUMDIGITS + 1];
@@ -306,7 +426,7 @@ static int do_directory(struct ast_channel *chan, struct ast_config *cfg, char *
 		return -1;
 	}
 	if (digit == '0') {
-		if (!ast_goto_if_exists(chan, chan->context, "o", 1) ||
+		if (!ast_goto_if_exists(chan, dialcontext, "o", 1) ||
 		    (!ast_strlen_zero(chan->macrocontext) &&
 		     !ast_goto_if_exists(chan, chan->macrocontext, "o", 1))) {
 			return 0;
@@ -317,7 +437,7 @@ static int do_directory(struct ast_channel *chan, struct ast_config *cfg, char *
 		}
 	}	
 	if (digit == '*') {
-		if (!ast_goto_if_exists(chan, chan->context, "a", 1) ||
+		if (!ast_goto_if_exists(chan, dialcontext, "a", 1) ||
 		    (!ast_strlen_zero(chan->macrocontext) &&
 		     !ast_goto_if_exists(chan, chan->macrocontext, "a", 1))) {
 			return 0;
@@ -350,7 +470,7 @@ static int do_directory(struct ast_channel *chan, struct ast_config *cfg, char *
 							pos = strrchr(pos, ' ') + 1;
 						conv = convert(pos);
 						if (conv) {
-							if (!strcmp(conv, ext)) {
+							if (!strncmp(conv, ext, strlen(ext))) {
 								/* Match! */
 								found++;
 								free(conv);
@@ -367,7 +487,7 @@ static int do_directory(struct ast_channel *chan, struct ast_config *cfg, char *
 
 			if (v) {
 				/* We have a match -- play a greeting if they have it */
-				res = play_mailbox_owner(chan, context, dialcontext, v->name, name);
+				res = play_mailbox_owner(chan, context, dialcontext, v->name, name, fromappvm);
 				switch (res) {
 					case -1:
 						/* user pressed '1' but extension does not exist, or
@@ -414,6 +534,7 @@ static int directory_exec(struct ast_channel *chan, void *data)
 	struct localuser *u;
 	struct ast_config *cfg;
 	int last = 1;
+	int fromappvm = 0;
 	char *context, *dialcontext, *dirintro, *options;
 
 	if (ast_strlen_zero(data)) {
@@ -434,6 +555,8 @@ static int directory_exec(struct ast_channel *chan, void *data)
 			options++; 
 			if (strchr(options, 'f'))
 				last = 0;
+			if (strchr(options, 'v'))
+				fromappvm = 1;
 		}
 	} else	
 		dialcontext = context;
@@ -466,7 +589,7 @@ static int directory_exec(struct ast_channel *chan, void *data)
 		if (!res)
 			res = ast_waitfordigit(chan, 5000);
 		if (res > 0) {
-			res = do_directory(chan, cfg, context, dialcontext, res, last);
+			res = do_directory(chan, cfg, context, dialcontext, res, last, fromappvm);
 			if (res > 0) {
 				res = ast_waitstream(chan, AST_DIGIT_ANY);
 				ast_stopstream(chan);
@@ -495,6 +618,25 @@ int unload_module(void)
 
 int load_module(void)
 {
+#ifdef USE_ODBC_STORAGE
+	struct ast_config *cfg = ast_config_load(VOICEMAIL_CONFIG);
+	char *tmp;
+
+	if (cfg) {
+		if ((tmp = ast_variable_retrieve(cfg, "general", "odbcstorage"))) {
+			ast_copy_string(odbc_database, tmp, sizeof(odbc_database));
+		}
+		if ((tmp = ast_variable_retrieve(cfg, "general", "odbctable"))) {
+			ast_copy_string(odbc_table, tmp, sizeof(odbc_table));
+		}
+		if ((tmp = ast_variable_retrieve(cfg, "general", "format"))) {
+			ast_copy_string(vmfmts, tmp, sizeof(vmfmts));
+		}
+		ast_config_destroy(cfg);
+	} else
+		ast_log(LOG_WARNING, "Unable to load " VOICEMAIL_CONFIG " - ODBC defaults will be used\n");
+#endif
+
 	return ast_register_application(app, directory_exec, synopsis, descrip);
 }
 

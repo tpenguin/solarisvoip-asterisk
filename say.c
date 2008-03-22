@@ -40,7 +40,7 @@
 
 #include "asterisk.h"
 
-ASTERISK_FILE_VERSION(__FILE__, "$Revision: 7221 $")
+ASTERISK_FILE_VERSION(__FILE__, "$Revision: 72924 $")
 
 #include "asterisk/file.h"
 #include "asterisk/channel.h"
@@ -62,7 +62,7 @@ int ast_say_character_str_full(struct ast_channel *chan, const char *str, const 
 	int num = 0;
 	int res = 0;
 
-	while (str[num]) {
+	while (str[num] && !res) {
 		fn = NULL;
 		switch (str[num]) {
 		case ('*'):
@@ -120,8 +120,12 @@ int ast_say_character_str_full(struct ast_channel *chan, const char *str, const 
 			fn = fnbuf;
 		}
 		res = ast_streamfile(chan, fn, lang);
-		if (!res) 
-			res = ast_waitstream_full(chan, ints, audiofd, ctrlfd);
+		if (!res) {
+			if ((audiofd  > -1) && (ctrlfd > -1))
+				res = ast_waitstream_full(chan, ints, audiofd, ctrlfd);
+			else
+				res = ast_waitstream(chan, ints);
+		}
 		ast_stopstream(chan);
 		num++;
 	}
@@ -142,7 +146,7 @@ int ast_say_phonetic_str_full(struct ast_channel *chan, const char *str, const c
 	int num = 0;
 	int res = 0;
 
-	while (str[num]) {
+	while (str[num] && !res) {
 		fn = NULL;
 		switch (str[num]) {
 		case ('*'):
@@ -199,8 +203,12 @@ int ast_say_phonetic_str_full(struct ast_channel *chan, const char *str, const c
 			fn = fnbuf;
 		}
 		res = ast_streamfile(chan, fn, lang);
-		if (!res) 
-			res = ast_waitstream_full(chan, ints, audiofd, ctrlfd);
+		if (!res) {
+			if ((audiofd  > -1) && (ctrlfd > -1))
+				res = ast_waitstream_full(chan, ints, audiofd, ctrlfd);
+			else
+				res = ast_waitstream(chan, ints);
+		}
 		ast_stopstream(chan);
 		num++;
 	}
@@ -249,8 +257,12 @@ int ast_say_digit_str_full(struct ast_channel *chan, const char *str, const char
 		}
 		if (fn) {
 			res = ast_streamfile(chan, fn, lang);
-			if (!res) 
-				res = ast_waitstream_full(chan, ints, audiofd, ctrlfd);
+			if (!res) {
+				if ((audiofd  > -1) && (ctrlfd > -1))
+                                        res = ast_waitstream_full(chan, ints, audiofd, ctrlfd);
+                                else
+                                        res = ast_waitstream(chan, ints);
+			}
 			ast_stopstream(chan);
 		}
 		num++;
@@ -4069,11 +4081,6 @@ int ast_say_date_with_format_fr(struct ast_channel *chan, time_t time, const cha
 			case 'k':
 				/* 24-Hour */
 				res = ast_say_number(chan, tm.tm_hour, ints, lang, (char * ) NULL);
-				if (!res) {
-					if (format[offset] == 'H') {
-						res = wait_file(chan,ints, "digits/oclock",lang);
-					}
-				}
 				if (!res)
 					res = wait_file(chan,ints, "digits/oclock",lang);
 				break;
@@ -4573,32 +4580,7 @@ int ast_say_date_with_format_nl(struct ast_channel *chan, time_t time, const cha
 				break;
 			case 'S':
 				/* Seconds */
-				if (tm.tm_sec == 0) {
-					snprintf(nextmsg,sizeof(nextmsg), "digits/%d", tm.tm_sec);
-					res = wait_file(chan,ints,nextmsg,lang);
-				} else if (tm.tm_sec < 10) {
-					res = wait_file(chan,ints, "digits/oh",lang);
-					if (!res) {
-						snprintf(nextmsg,sizeof(nextmsg), "digits/%d", tm.tm_sec);
-						res = wait_file(chan,ints,nextmsg,lang);
-					}
-				} else if ((tm.tm_sec < 21) || (tm.tm_sec % 10 == 0)) {
-					snprintf(nextmsg,sizeof(nextmsg), "digits/%d", tm.tm_sec);
-					res = wait_file(chan,ints,nextmsg,lang);
-				} else {
-					int ten, one;
-					ten = (tm.tm_sec / 10) * 10;
-					one = (tm.tm_sec % 10);
-					snprintf(nextmsg,sizeof(nextmsg), "digits/%d", ten);
-					res = wait_file(chan,ints,nextmsg,lang);
-					if (!res) {
-						/* Fifty, not fifty-zero */
-						if (one != 0) {
-							snprintf(nextmsg,sizeof(nextmsg), "digits/%d", one);
-							res = wait_file(chan,ints,nextmsg,lang);
-						}
-					}
-				}
+				res = ast_say_number(chan, tm.tm_sec, ints, lang, (char *) NULL);
 				break;
 			case 'T':
 				res = ast_say_date_with_format(chan, time, ints, lang, "HMS", timezone);

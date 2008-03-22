@@ -30,7 +30,7 @@
 
 #include "asterisk.h"
 
-ASTERISK_FILE_VERSION(__FILE__, "$Revision: 7221 $")
+ASTERISK_FILE_VERSION(__FILE__, "$Revision: 40821 $")
 
 #include "asterisk/file.h"
 #include "asterisk/logger.h"
@@ -82,7 +82,7 @@ static int random_exec(struct ast_channel *chan, void *data)
 	if ((!prob) || (sscanf(prob, "%d", &probint) != 1))
 		probint = 0;
 
-	if ((random() % 100) + probint > 100) {
+	if ((random() % 100) + probint >= 100) {
 		res = ast_parseable_goto(chan, s);
 		if (option_verbose > 2)
 			ast_verbose( VERBOSE_PREFIX_3 "Random branches to (%s,%s,%d)\n",
@@ -116,9 +116,8 @@ char *description(void)
 
 int usecount(void)
 {
-	int res;
-	STANDARD_USECOUNT(res);
-	return res;
+	/* Don't allow unload, since rand(3) depends upon this module being here. */
+	return 1;
 }
 
 char *key()

@@ -9,6 +9,8 @@
 #
 # hide: true
 
+# $Id: rc.mandrake.zaptel 67060 2007-06-04 17:10:30Z tilghman $
+
 # Source function library.
 . /etc/rc.d/init.d/functions
 
@@ -17,7 +19,15 @@
 MODULES="usb-uhci zaptel wcfxo wcusb"
 ######################################
 
-[ -f /etc/sysconfig/`basename $0` ] && . /etc/sysconfig/`basename $0`
+# Resolve back to the basename (i.e. zaptel, not S90zaptel)
+if [ 0`readlink $0` = "0" ]; then
+	CONFIGFILE=/etc/sysconfig/`basename $0`
+else
+	CONFIG0=`readlink $0`
+	CONFIGFILE=/etc/sysconfig/`basename $CONFIG0`
+fi
+
+[ -f $CONFIGFILE ] && . $CONFIGFILE
 
 function probe() {
 	gprintf "                           $1"

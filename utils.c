@@ -37,9 +37,11 @@
 
 #include "asterisk.h"
 
-ASTERISK_FILE_VERSION(__FILE__, "$Revision: 7468 $")
+ASTERISK_FILE_VERSION(__FILE__, "$Revision: 56729 $")
 
+#define AST_API_MODULE
 #include "asterisk/lock.h"
+
 #include "asterisk/io.h"
 #include "asterisk/logger.h"
 #include "asterisk/md5.h"
@@ -195,6 +197,7 @@ struct hostent *ast_gethostbyname(const char *host, struct ast_hostent *hp)
 		if (dots != 3)
 			return NULL;
 		memset(hp, 0, sizeof(struct ast_hostent));
+		hp->hp.h_addrtype = AF_INET;
 		hp->hp.h_addr_list = (void *) hp->buf;
 		hp->hp.h_addr = hp->buf + sizeof(void *);
 		if (inet_pton(AF_INET, host, hp->hp.h_addr) > 0)
@@ -399,14 +402,6 @@ static void base64_init(void)
 	base64[63] = '/';
 	b2a[(int)'+'] = 62;
 	b2a[(int)'/'] = 63;
-#if 0
-	for (x=0;x<64;x++) {
-		if (b2a[(int)base64[x]] != x) {
-			fprintf(stderr, "!!! %d failed\n", x);
-		} else
-			fprintf(stderr, "--- %d passed\n", x);
-	}
-#endif
 }
 
 /*! \brief  ast_uri_encode: Turn text string to URI-encoded %XX version ---*/
@@ -527,7 +522,7 @@ char *ast_strip_quoted(char *s, const char *beg_quotes, const char *end_quotes)
 	char *q;
 
 	s = ast_strip(s);
-	if ((q = strchr(beg_quotes, *s))) {
+	if ((q = strchr(beg_quotes, *s)) && *q != '\0') {
 		e = s + strlen(s) - 1;
 		if (*e == *(end_quotes + (q - beg_quotes))) {
 			s++;
@@ -902,4 +897,26 @@ char *ast_process_quotes_and_slashes(char *start, char find, char replace_with)
 	if (start != dataPut)
 		*dataPut = 0;
 	return dataPut;
+}
+
+void ast_enable_packet_fragmentation(int sock)
+{
+#ifdef __linux__
+	int val = IP_PMTUDISC_DONT;
+	
+	if (setsockopt(sock, IPPROTO_IP, IP_MTU_DISCOVER, &val, sizeof(val)))
+		ast_log(LOG_WARNING, "Unable to disable PMTU discovery. Large UDP packets may fail to be delivered when sent from this socket.\n");
+#endif
+}
+
+AST_MUTEX_DEFINE_STATIC(fetchadd_m); /* used for all fetc&add ops */
+
+int ast_atomic_fetchadd_int_slow(volatile int *p, int v)
+{
+        int ret;
+        ast_mutex_lock(&fetchadd_m);
+        ret = *p;
+        *p += v;
+        ast_mutex_unlock(&fetchadd_m);
+        return ret;
 }

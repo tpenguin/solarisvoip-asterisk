@@ -35,7 +35,7 @@
 
 #include "asterisk.h"
 
-ASTERISK_FILE_VERSION(__FILE__, "$Revision: 9073 $")
+ASTERISK_FILE_VERSION(__FILE__, "$Revision: 59299 $")
 
 #include "asterisk/file.h"
 #include "asterisk/logger.h"
@@ -140,6 +140,7 @@ SQLHSTMT odbc_prepare_and_execute(odbc_obj *obj, SQLHSTMT (*prepare_cb)(odbc_obj
 
 				ast_log(LOG_WARNING, "SQL Execute error %d! Attempting a reconnect...\n", res);
 				SQLFreeHandle(SQL_HANDLE_STMT, stmt);
+				stmt = NULL;
 
 				ast_mutex_lock(&obj->lock);
 				obj->up = 0;
@@ -250,7 +251,6 @@ static int load_odbc_config(void)
 	char *cat, *dsn, *username, *password;
 	int enabled;
 	int connect = 0;
-	char *env_var;
 
 	odbc_obj *obj;
 
@@ -259,16 +259,10 @@ static int load_odbc_config(void)
 		for (cat = ast_category_browse(config, NULL); cat; cat=ast_category_browse(config, cat)) {
 			if (!strcmp(cat, "ENV")) {
 				for (v = ast_variable_browse(config, cat); v; v = v->next) {
-					env_var = malloc(strlen(v->name) + strlen(v->value) + 2);
-					if (env_var) {
-						sprintf(env_var, "%s=%s", v->name, v->value);
-						ast_log(LOG_NOTICE, "Adding ENV var: %s=%s\n", v->name, v->value);
-						putenv(env_var);
-						free(env_var);
-					}
+					setenv(v->name, v->value, 1);
 				}
 
-			cat = ast_category_browse(config, cat);
+				cat = ast_category_browse(config, cat);
 			}
 
 			dsn = username = password = NULL;

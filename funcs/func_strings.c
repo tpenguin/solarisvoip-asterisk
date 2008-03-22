@@ -30,7 +30,7 @@
 
 #include "asterisk.h"
 
-/* ASTERISK_FILE_VERSION(__FILE__, "$Revision: 13925 $") */
+/* ASTERISK_FILE_VERSION(__FILE__, "$Revision: 66537 $") */
 
 #include "asterisk/channel.h"
 #include "asterisk/pbx.h"
@@ -41,15 +41,20 @@
 
 static char *function_fieldqty(struct ast_channel *chan, char *cmd, char *data, char *buf, size_t len)
 {
-	char *varname, *varval, workspace[256];
+	char *varname, *varsubst, varval[8192] = "", *varval2 = varval;
 	char *delim = ast_strdupa(data);
 	int fieldcount = 0;
 
 	if (delim) {
 		varname = strsep(&delim, "|");
-		pbx_retrieve_variable(chan, varname, &varval, workspace, sizeof(workspace), NULL);
-		if (delim) {
-			while (strsep(&varval, delim))
+		varsubst = alloca(strlen(varname) + 4);
+
+		sprintf(varsubst, "${%s}", varname);
+		pbx_substitute_variables_helper(chan, varsubst, varval, sizeof(varval) - 1);
+		if (ast_strlen_zero(varval))
+			fieldcount = 0;
+		else if (delim) {
+			while (strsep(&varval2, delim))
 				fieldcount++;
 		} else if (!ast_strlen_zero(varval)) {
 			fieldcount = 1;
@@ -57,7 +62,7 @@ static char *function_fieldqty(struct ast_channel *chan, char *cmd, char *data, 
 		snprintf(buf, len, "%d", fieldcount);
 	} else {
 		ast_log(LOG_ERROR, "Out of memory\n");
-		strncpy(buf, "1", len);
+		ast_copy_string(buf, "1", len);
 	}
 	return buf;
 }

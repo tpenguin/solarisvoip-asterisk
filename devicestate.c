@@ -30,7 +30,7 @@
 
 #include "asterisk.h"
 
-ASTERISK_FILE_VERSION(__FILE__, "$Revision: 9404 $")
+ASTERISK_FILE_VERSION(__FILE__, "$Revision: 67593 $")
 
 #include "asterisk/channel.h"
 #include "asterisk/utils.h"
@@ -196,13 +196,16 @@ static void do_state_change(const char *device)
 
 static int __ast_device_state_changed_literal(char *buf)
 {
-	char *device, *tmp;
+	char *device;
 	struct state_change *change = NULL;
+	char *tmp = NULL;
 
 	device = buf;
+
 	tmp = strrchr(device, '-');
 	if (tmp)
 		*tmp = '\0';
+
 	if (change_thread != AST_PTHREADT_NULL)
 		change = calloc(1, sizeof(*change) + strlen(device));
 

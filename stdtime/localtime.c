@@ -1496,8 +1496,8 @@ const char * const	zone;
 #ifdef	_THREAD_SAFE
 	ast_mutex_lock(&lcl_mutex);
 #endif
-	ast_tzset(ast_strlen_zero(zone) ? "/etc/localtime" : zone);
-	mktime_return_value = time1(tmp, localsub, 0L, ast_strlen_zero(zone) ? "/etc/localtime" : zone);
+	ast_tzset(!ast_strlen_zero(zone) ? zone : "/etc/localtime");
+	mktime_return_value = time1(tmp, localsub, 0L, !ast_strlen_zero(zone) ? zone : "/etc/localtime");
 #ifdef	_THREAD_SAFE
 	ast_mutex_unlock(&lcl_mutex);
 #endif

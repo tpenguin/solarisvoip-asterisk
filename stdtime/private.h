@@ -21,10 +21,10 @@
 #define	HAVE_UNISTD_H	1
 #define	LOCALE_HOME	_PATH_LOCALE
 #ifdef SOLARIS
-#define TZDIR       "/usr/share/lib/zoneinfo"
+#define TZDIR		"/usr/share/lib/zoneinfo"
 #else
 #define TZDIR		"/usr/share/zoneinfo"
-#endif
+#endif /* def SOLARIS */
 #endif /* ndef TM_GMTOFF */
 
 /*

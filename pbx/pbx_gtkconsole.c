@@ -45,7 +45,7 @@
 
 #include "asterisk.h"
 
-ASTERISK_FILE_VERSION(__FILE__, "$Revision: 7221 $")
+ASTERISK_FILE_VERSION(__FILE__, "$Revision: 43269 $")
 
 #include "asterisk/pbx.h"
 #include "asterisk/config.h"
@@ -496,7 +496,7 @@ int load_module(void)
 	} else {
 		if (option_debug)
 			ast_log(LOG_DEBUG, "Unable to start GTK console monitor -- ignoring\n");
-		else if (option_verbose > 1)
+		if (option_verbose > 1)
 			ast_verbose( VERBOSE_PREFIX_2 "GTK is not available -- skipping monitor\n");
 	}
 	return 0;

@@ -90,7 +90,7 @@ extern int daemon(int, int);  /* defined in libresolv of all places */
 
 #include "asterisk.h"
 
-ASTERISK_FILE_VERSION(__FILE__, "$Revision: 19351 $")
+ASTERISK_FILE_VERSION(__FILE__, "$Revision: 72373 $")
 
 #include "asterisk/logger.h"
 #include "asterisk/options.h"
@@ -135,7 +135,7 @@ ASTERISK_FILE_VERSION(__FILE__, "$Revision: 19351 $")
 
 /*! \brief Welcome message when starting a CLI interface */
 #define WELCOME_MESSAGE \
-	ast_verbose("Asterisk " ASTERISK_VERSION ", Copyright (C) 1999 - 2006 Digium, Inc. and others.\n"); \
+	ast_verbose("Asterisk " ASTERISK_VERSION ", Copyright (C) 1999 - 2007 Digium, Inc. and others.\n"); \
 	ast_verbose("Created by Mark Spencer <markster@digium.com>\n"); \
 	ast_verbose("Asterisk comes with ABSOLUTELY NO WARRANTY; type 'show warranty' for details.\n"); \
 	ast_verbose("This is free software, with components licensed under the GNU General Public\n"); \
@@ -234,6 +234,12 @@ static char *_argv[256];
 static int shuttingdown = 0;
 static int restartnow = 0;
 static pthread_t consolethread = AST_PTHREADT_NULL;
+
+static int sig_alert_pipe[2] = { -1, -1 };
+static struct {
+	 unsigned int need_reload:1;
+	 unsigned int need_quit:1;
+} sig_flags;
 
 #if !defined(LOW_MEMORY)
 struct file_version {
@@ -444,11 +450,13 @@ int ast_safe_system(const char *s)
 	pid = fork();
 
 	if (pid == 0) {
+		if (option_highpriority)
+			ast_set_priority(0);
 		/* Close file descriptors and launch system command */
 		for (x = STDERR_FILENO + 1; x < 4096; x++)
 			close(x);
 		execl("/bin/sh", "/bin/sh", "-c", s, NULL);
-		exit(1);
+		_exit(1);
 	} else if (pid > 0) {
 		for(;;) {
 			res = wait4(pid, &status, 0, &rusage);
@@ -733,27 +741,23 @@ static int ast_tryconnect(void)
  Called by soft_hangup to interrupt the poll, read, or other
  system call.  We don't actually need to do anything though.  
  Remember: Cannot EVER ast_log from within a signal handler 
- SLD: seems to be some pthread activity relating to the printf anyway:
- which is leading to a deadlock? 
  */
 static void urg_handler(int num)
 {
-#if 0
-	if (option_debug > 2) 
-		printf("-- Asterisk Urgent handler\n");
-#endif
 	signal(num, urg_handler);
 	return;
 }
 
 static void hup_handler(int num)
 {
+	int a = 0;
 	if (option_verbose > 1) 
 		printf("Received HUP signal -- Reloading configs\n");
 	if (restartnow)
 		execvp(_argv[0], _argv);
-	/* XXX This could deadlock XXX */
-	ast_module_reload(NULL);
+	sig_flags.need_reload = 1;
+	if (sig_alert_pipe[1] != -1)
+		write(sig_alert_pipe[1], &a, sizeof(a));
 	signal(num, hup_handler);
 }
 
@@ -792,6 +796,7 @@ int ast_set_priority(int pri)
 	struct sched_param sched;
 	memset(&sched, 0, sizeof(sched));
 #ifdef __linux__
+#undef sched_setscheduler
 	if (pri) {  
 		sched.sched_priority = 10;
 		if (sched_setscheduler(0, SCHED_RR, &sched)) {
@@ -802,12 +807,11 @@ int ast_set_priority(int pri)
 				ast_verbose("Set to realtime thread\n");
 	} else {
 		sched.sched_priority = 0;
-		if (sched_setscheduler(0, SCHED_OTHER, &sched)) {
-			ast_log(LOG_WARNING, "Unable to set normal priority\n");
-			return -1;
-		}
+		/* According to the manpage, this can never fail, with these parameters. */
+		sched_setscheduler(0, SCHED_OTHER, &sched);
 	}
 #else
+#undef setpriority
 	if (pri) {
 		if (setpriority(PRIO_PROCESS, 0, -10) == -1) {
 			ast_log(LOG_WARNING, "Unable to set high priority\n");
@@ -816,10 +820,8 @@ int ast_set_priority(int pri)
 			if (option_verbose)
 				ast_verbose("Set to high priority\n");
 	} else {
-		if (setpriority(PRIO_PROCESS, 0, 0) == -1) {
-			ast_log(LOG_WARNING, "Unable to set normal priority\n");
-			return -1;
-		}
+		/* According to the manpage, this can never fail, with these parameters. */
+		setpriority(PRIO_PROCESS, 0, 0);
 	}
 #endif
 	return 0;
@@ -901,7 +903,7 @@ static void quit_handler(int num, int nice, int safeshutdown, int restart)
 	/* Called on exit */
 	if (option_verbose && option_console)
 		ast_verbose("Asterisk %s ending (%d).\n", ast_active_channels() ? "uncleanly" : "cleanly", num);
-	else if (option_debug)
+	if (option_debug)
 		ast_log(LOG_DEBUG, "Asterisk ending (%d).\n", num);
 	manager_event(EVENT_FLAG_SYSTEM, "Shutdown", "Shutdown: %s\r\nRestart: %s\r\n", ast_active_channels() ? "Uncleanly" : "Cleanly", restart ? "True" : "False");
 	if (ast_socket > -1) {
@@ -912,8 +914,7 @@ static void quit_handler(int num, int nice, int safeshutdown, int restart)
 	}
 	if (ast_consock > -1)
 		close(ast_consock);
-	if (!option_remote) 
-		unlink((char *)ast_config_AST_PID);
+	if (!option_remote) unlink((char *)ast_config_AST_PID);
 	printf(term_quit());
 	if (restart) {
 		if (option_verbose || option_console)
@@ -947,7 +948,12 @@ static void quit_handler(int num, int nice, int safeshutdown, int restart)
 
 static void __quit_handler(int num)
 {
-	quit_handler(num, 0, 1, 0);
+	int a = 0;
+	sig_flags.need_quit = 1;
+	if (sig_alert_pipe[1] != -1)
+		write(sig_alert_pipe[1], &a, sizeof(a));
+	/* There is no need to restore the signal handler here, since the app
+	 * is going to exit */
 }
 
 static const char *fix_header(char *outbuf, int maxout, const char *s, char *cmp)
@@ -1000,46 +1006,40 @@ static void consolehandler(char *s)
 {
 	printf(term_end());
 	fflush(stdout);
+
 	/* Called when readline data is available */
-	if (s && !ast_all_zeros(s))
+	if (!ast_all_zeros(s))
 		ast_el_add_history(s);
-	/* Give the console access to the shell */
-	if (s) {
-		/* The real handler for bang */
-		if (s[0] == '!') {
-			if (s[1])
-				ast_safe_system(s+1);
-			else
-				ast_safe_system(getenv("SHELL") ? getenv("SHELL") : "/bin/sh");
-		} else 
+	/* The real handler for bang */
+	if (s[0] == '!') {
+		if (s[1])
+			ast_safe_system(s+1);
+		else
+			ast_safe_system(getenv("SHELL") ? getenv("SHELL") : "/bin/sh");
+	} else 
 		ast_cli_command(STDOUT_FILENO, s);
-	} else
-		fprintf(stdout, "\nUse \"quit\" to exit\n");
 }
 
 static int remoteconsolehandler(char *s)
 {
 	int ret = 0;
+
 	/* Called when readline data is available */
-	if (s && !ast_all_zeros(s))
+	if (!ast_all_zeros(s))
 		ast_el_add_history(s);
-	/* Give the console access to the shell */
-	if (s) {
-		/* The real handler for bang */
-		if (s[0] == '!') {
-			if (s[1])
-				ast_safe_system(s+1);
-			else
-				ast_safe_system(getenv("SHELL") ? getenv("SHELL") : "/bin/sh");
-			ret = 1;
-		}
-		if ((strncasecmp(s, "quit", 4) == 0 || strncasecmp(s, "exit", 4) == 0) &&
-		    (s[4] == '\0' || isspace(s[4]))) {
-			quit_handler(0, 0, 0, 0);
-			ret = 1;
-		}
-	} else
-		fprintf(stdout, "\nUse \"quit\" to exit\n");
+	/* The real handler for bang */
+	if (s[0] == '!') {
+		if (s[1])
+			ast_safe_system(s+1);
+		else
+			ast_safe_system(getenv("SHELL") ? getenv("SHELL") : "/bin/sh");
+		ret = 1;
+	}
+	if ((strncasecmp(s, "quit", 4) == 0 || strncasecmp(s, "exit", 4) == 0) &&
+	    (s[4] == '\0' || isspace(s[4]))) {
+		quit_handler(0, 0, 0, 0);
+		ret = 1;
+	}
 
 	return ret;
 }
@@ -1668,7 +1668,9 @@ static char *cli_complete(EditLine *el, int ch)
 				retval = CC_REFRESH;
 			}
 		}
-	free(matches);
+		for (i=0; matches[i]; i++)
+			free(matches[i]);
+		free(matches);
 	}
 
 	return (char *)(long)retval;
@@ -1804,17 +1806,19 @@ static void ast_remotecontrol(char * data)
 
 	if (option_exec && data) {  /* hack to print output then exit if asterisk -rx is used */
 		char tempchar;
-		struct pollfd fds[0];
-		fds[0].fd = ast_consock;
-		fds[0].events = POLLIN;
-		fds[0].revents = 0;
-		while(poll(fds, 1, 100) > 0) {
+		struct pollfd fds;
+		fds.fd = ast_consock;
+		fds.events = POLLIN;
+		fds.revents = 0;
+		while (poll(&fds, 1, 100) > 0)
 			ast_el_read_char(el, &tempchar);
-		}
 		return;
 	}
 	for(;;) {
 		ebuf = (char *)el_gets(el, &num);
+
+		if (!ebuf && write(1, "", 1) < 0)
+			break;
 
 		if (!ast_strlen_zero(ebuf)) {
 			if (ebuf[strlen(ebuf)-1] == '\n')
@@ -2013,6 +2017,26 @@ static void ast_readconfig(void) {
 		v = v->next;
 	}
 	ast_config_destroy(cfg);
+}
+
+static void *monitor_sig_flags(void *unused)
+{
+	for (;;) {
+		struct pollfd p = { sig_alert_pipe[0], POLLIN, 0 };
+		int a;
+		poll(&p, 1, -1);
+		if (sig_flags.need_reload) {
+			sig_flags.need_reload = 0;
+			ast_module_reload(NULL);
+		}
+		if (sig_flags.need_quit) {
+			sig_flags.need_quit = 0;
+			quit_handler(0, 0, 1, 0);
+		}
+		read(sig_alert_pipe[0], &a, sizeof(a));
+	}
+
+	return NULL;
 }
 
 int main(int argc, char *argv[])
@@ -2311,6 +2335,7 @@ int main(int argc, char *argv[])
 			fclose(f);
 		} else
 			ast_log(LOG_WARNING, "Unable to open pid file '%s': %s\n", (char *)ast_config_AST_PID, strerror(errno));
+		ast_mainpid = getpid();
 	}
 
 	/* Test recursive mutex locking. */
@@ -2386,10 +2411,6 @@ int main(int argc, char *argv[])
 		printf(term_quit());
 		exit(1);
 	}
-	if (load_modules(0)) {
-		printf(term_quit());
-		exit(1);
-	}
 	if (init_framer()) {
 		printf(term_quit());
 		exit(1);
@@ -2399,6 +2420,10 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 	if (ast_enum_init()) {
+		printf(term_quit());
+		exit(1);
+	}
+	if (load_modules(0)) {
 		printf(term_quit());
 		exit(1);
 	}
@@ -2424,6 +2449,10 @@ int main(int argc, char *argv[])
 		ast_verbose(term_color(tmp, "Asterisk Ready.\n", COLOR_BRWHITE, COLOR_BLACK, sizeof(tmp)));
 	if (option_nofork)
 		consolethread = pthread_self();
+
+	if (pipe(sig_alert_pipe))
+		sig_alert_pipe[0] = sig_alert_pipe[1] = -1;
+
 	fully_booted = 1;
 	pthread_sigmask(SIG_UNBLOCK, &sigs, NULL);
 #ifdef __AST_DEBUG_MALLOC
@@ -2435,20 +2464,32 @@ int main(int argc, char *argv[])
 		/* Console stuff now... */
 		/* Register our quit function */
 		char title[256];
+		pthread_attr_t attr;
+		pthread_t dont_care;
+
+		pthread_attr_init(&attr);
+		pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+		ast_pthread_create(&dont_care, &attr, monitor_sig_flags, NULL);
+		pthread_attr_destroy(&attr);
+
 		set_icon("Asterisk");
 		snprintf(title, sizeof(title), "Asterisk Console on '%s' (pid %d)", hostname, ast_mainpid);
 		set_title(title);
 
 		for (;;) {
 			buf = (char *)el_gets(el, &num);
+
+			if (!buf && write(1, "", 1) < 0)
+				goto lostterm;
+
 			if (buf) {
 				if (buf[strlen(buf)-1] == '\n')
 					buf[strlen(buf)-1] = '\0';
 
 				consolehandler((char *)buf);
-			} else {
+			} else if (option_remote) {
 				if (write(STDOUT_FILENO, "\nUse EXIT or QUIT to exit the asterisk console\n",
-								  strlen("\nUse EXIT or QUIT to exit the asterisk console\n")) < 0) {
+					  strlen("\nUse EXIT or QUIT to exit the asterisk console\n")) < 0) {
 					/* Whoa, stdout disappeared from under us... Make /dev/null's */
 					int fd;
 					fd = open("/dev/null", O_RDWR);
@@ -2461,12 +2502,10 @@ int main(int argc, char *argv[])
 				}
 			}
 		}
+	}
 
-	}
-	/* Do nothing */
-	for(;;)  {	/* apparently needed for the MACos */
-		struct pollfd p = { -1 /* no descriptor */, 0, 0 };
-		poll(&p, 0, -1);
-	}
+	monitor_sig_flags(NULL);
+
+lostterm:
 	return 0;
 }

@@ -157,7 +157,7 @@ enum {HF_SCAN_OFF,HF_SCAN_DOWN_SLOW,HF_SCAN_DOWN_QUICK,HF_SCAN_DOWN_FAST,HF_SCAN
 
 #include "asterisk.h"
 
-ASTERISK_FILE_VERSION(__FILE__, "$Revision: 7221 $")
+ASTERISK_FILE_VERSION(__FILE__, "$Revision: 53045 $")
 
 #include <signal.h>
 #include <stdio.h>
@@ -897,55 +897,54 @@ static int telem_lookup(struct ast_channel *chan, char *node, char *name)
 
 static int get_wait_interval(struct rpt *myrpt, int type)
 {
-        int interval;
-        char *wait_times;
-        char *wait_times_save;
-                                                                                                                  
-        wait_times_save = NULL;
-        wait_times = ast_variable_retrieve(cfg, myrpt->name, "wait_times");
-                                                                                                                  
-        if(wait_times){
-                wait_times_save = ast_strdupa(wait_times);
-                if(!wait_times_save){
-                        ast_log(LOG_WARNING, "Out of memory in wait_interval()\n");
-                        wait_times = NULL;
-                }
-        }
-                                                                                                                  
-        switch(type){
-                case DLY_TELEM:
-                        if(wait_times)
-                                interval = retrieve_astcfgint(wait_times_save, "telemwait", 500, 5000, 1000);
-                        else
-                                interval = 1000;
-                        break;
-                                                                                                                  
-                case DLY_ID:
-                        if(wait_times)
-                                interval = retrieve_astcfgint(wait_times_save, "idwait",250,5000,500);
-                        else
-                                interval = 500;
-                        break;
-                                                                                                                  
-                case DLY_UNKEY:
-                        if(wait_times)
-                                interval = retrieve_astcfgint(wait_times_save, "unkeywait",500,5000,1000);
-                        else
-                                interval = 1000;
-                        break;
-                                                                                                                  
-                case DLY_CALLTERM:
-                        if(wait_times)
-                                interval = retrieve_astcfgint(wait_times_save, "calltermwait",500,5000,1500);
-                        else
-                                interval = 1500;
-                        break;
-                                                                                                                  
-                default:
-                        return 0;
-        }
+	int interval;
+	char *wait_times;
+	char *wait_times_save = NULL;
+
+	wait_times = ast_variable_retrieve(cfg, myrpt->name, "wait_times");
+
+	if (wait_times) {
+		wait_times_save = ast_strdupa(wait_times);
+		if (!wait_times_save) {
+			ast_log(LOG_WARNING, "Out of memory in wait_interval()\n");
+			wait_times = NULL;
+		}
+	}
+
+	switch (type) {
+	case DLY_TELEM:
+		if (wait_times)
+			interval = retrieve_astcfgint(wait_times_save, "telemwait", 500, 5000, 1000);
+		else
+			interval = 1000;
+		break;
+
+	case DLY_ID:
+		if (wait_times)
+			interval = retrieve_astcfgint(wait_times_save, "idwait", 250, 5000, 500);
+		else
+			interval = 500;
+		break;
+
+	case DLY_UNKEY:
+		if (wait_times)
+			interval = retrieve_astcfgint(wait_times_save, "unkeywait", 500, 5000, 1000);
+		else
+			interval = 1000;
+		break;
+
+	case DLY_CALLTERM:
+		if (wait_times)
+			interval = retrieve_astcfgint(wait_times_save, "calltermwait", 500, 5000, 1500);
+		else
+			interval = 1500;
+		break;
+
+	default:
+		return 0;
+	}
 	return interval;
-}                                                                                                                  
+}														  
 
 
 /*
@@ -1522,6 +1521,7 @@ pthread_attr_t attr;
         pthread_attr_init(&attr);
         pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
 	ast_pthread_create(&tele->threadid,&attr,rpt_tele_thread,(void *) tele);
+	pthread_attr_destroy(&attr);
 	return;
 }
 
@@ -2154,6 +2154,7 @@ static int function_autopatchup(struct rpt *myrpt, char *param, char *digitbuf, 
 	pthread_attr_init(&attr);
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
 	ast_pthread_create(&myrpt->rpt_call_thread,&attr,rpt_call,(void *) myrpt);
+	pthread_attr_destroy(&attr);
 	return DC_COMPLETE;
 }
 
@@ -5240,6 +5241,7 @@ char cmd[MAXDTMF+1] = "";
 					        pthread_attr_init(&attr);
 			 		        pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
 						ast_pthread_create(&myrpt->rpt_call_thread,&attr,rpt_call,(void *)myrpt);
+						pthread_attr_destroy(&attr);
 						continue;
 					}
 				}
@@ -5782,6 +5784,7 @@ pthread_attr_t attr;
 	        pthread_attr_init(&attr);
 	        pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
 		ast_pthread_create(&rpt_vars[i].rpt_thread,&attr,rpt,(void *) &rpt_vars[i]);
+		pthread_attr_destroy(&attr);
 	}
 	usleep(500000);
 	for(;;)
@@ -5817,6 +5820,7 @@ pthread_attr_t attr;
 			        pthread_attr_init(&attr);
 	 		        pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
 				ast_pthread_create(&rpt_vars[i].rpt_thread,&attr,rpt,(void *) &rpt_vars[i]);
+				pthread_attr_destroy(&attr);
 				ast_log(LOG_WARNING, "rpt_thread restarted on node %s\n", rpt_vars[i].name);
 			}
 

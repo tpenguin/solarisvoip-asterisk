@@ -41,7 +41,7 @@
 
 #include "asterisk.h"
 
-ASTERISK_FILE_VERSION(__FILE__, "$Revision: 17489 $")
+ASTERISK_FILE_VERSION(__FILE__, "$Revision: 37691 $")
 
 #include "asterisk/logger.h"
 #include "asterisk/options.h"
@@ -80,27 +80,29 @@ struct naptr {
 } __attribute__ ((__packed__));
 
 /*--- parse_ie: Parse NAPTR record information elements */
-static int parse_ie(char *data, int maxdatalen, char *src, int srclen)
+static unsigned int parse_ie(unsigned char *data, unsigned int maxdatalen, unsigned char *src, unsigned int srclen)
 {
-	int len, olen;
+	unsigned int len, olen;
 
-	len = olen = (int)src[0];
+	len = olen = (unsigned int) src[0];
 	src++;
 	srclen--;
-	if (len > srclen || len < 0 ) {
+
+	if (len > srclen) {
 		ast_log(LOG_WARNING, "ENUM parsing failed: Wanted %d characters, got %d\n", len, srclen);
 		return -1;
 	}
+
 	if (len > maxdatalen)
 		len = maxdatalen;
 	memcpy(data, src, len);
+
 	return olen + 1;
 }
 
 /*--- parse_naptr: Parse DNS NAPTR record used in ENUM ---*/
-static int parse_naptr(char *dst, int dstsize, char *tech, int techsize, char *answer, int len, char *naptrinput)
+static int parse_naptr(unsigned char *dst, int dstsize, char *tech, int techsize, unsigned char *answer, int len, unsigned char *naptrinput)
 {
-
 	char tech_return[80];
 	char *oanswer = answer;
 	char flags[512] = "";
@@ -210,12 +212,6 @@ static int parse_naptr(char *dst, int dstsize, char *tech, int techsize, char *a
 	subst   = delim2 + 1;
 	regexp[regexp_len-1] = 0;
 
-#if 0
-	printf("Pattern: %s\n", pattern);
-	printf("Subst: %s\n", subst);
-       printf("Input: %s\n", naptrinput);
-#endif
-
 /*
  * now do the regex wizardry.
  */
@@ -310,9 +306,6 @@ struct enum_context {
 static int txt_callback(void *context, char *answer, int len, char *fullanswer)
 {
 	struct enum_context *c = (struct enum_context *)context;
-#if 0
-	printf("ENUMTXT Called\n");
-#endif
 
 	if (answer == NULL) {
 		c->txt = NULL;
@@ -344,7 +337,7 @@ static int txt_callback(void *context, char *answer, int len, char *fullanswer)
 /*--- enum_callback: Callback from ENUM lookup function */
 static int enum_callback(void *context, char *answer, int len, char *fullanswer)
 {
-	struct enum_context *c = (struct enum_context *)context;
+       struct enum_context *c = (struct enum_context *)context;
        void *p = NULL;
        int res;
 
@@ -362,7 +355,6 @@ static int enum_callback(void *context, char *answer, int len, char *fullanswer)
                        if (p) {
                                c->naptr_rrs = (struct enum_naptr_rr*)p;
                                memcpy(&c->naptr_rrs[c->naptr_rrs_count].naptr, answer, sizeof(struct naptr));
-                               /* printf("order=%d, pref=%d\n", ntohs(c->naptr_rrs[c->naptr_rrs_count].naptr.order), ntohs(c->naptr_rrs[c->naptr_rrs_count].naptr.pref)); */
                                c->naptr_rrs[c->naptr_rrs_count].result = strdup(c->dst);
                                c->naptr_rrs[c->naptr_rrs_count].tech = strdup(c->tech);
                                c->naptr_rrs[c->naptr_rrs_count].sort_pos = c->naptr_rrs_count;
@@ -492,42 +484,51 @@ int ast_get_enum(struct ast_channel *chan, const char *number, char *dst, int ds
 		ret = 0;
 	}
 
-       if (context.naptr_rrs_count >= context.position && ! (context.options & ENUMLOOKUP_OPTIONS_COUNT)) {
-               /* sort array by NAPTR order/preference */
-               for (k=0; k<context.naptr_rrs_count; k++) {
-                       for (i=0; i<context.naptr_rrs_count; i++) {
-                               /* use order first and then preference to compare */
-                               if ((ntohs(context.naptr_rrs[k].naptr.order) < ntohs(context.naptr_rrs[i].naptr.order)
-                                               && context.naptr_rrs[k].sort_pos > context.naptr_rrs[i].sort_pos)
-                                       || (ntohs(context.naptr_rrs[k].naptr.order) > ntohs(context.naptr_rrs[i].naptr.order)
-                                               && context.naptr_rrs[k].sort_pos < context.naptr_rrs[i].sort_pos)){
-                                       z = context.naptr_rrs[k].sort_pos;
-                                       context.naptr_rrs[k].sort_pos = context.naptr_rrs[i].sort_pos;
-                                       context.naptr_rrs[i].sort_pos = z;
-                                       continue;
-                               }
-                               if (ntohs(context.naptr_rrs[k].naptr.order) == ntohs(context.naptr_rrs[i].naptr.order)) {
-                                       if ((ntohs(context.naptr_rrs[k].naptr.pref) < ntohs(context.naptr_rrs[i].naptr.pref)
-                                                       && context.naptr_rrs[k].sort_pos > context.naptr_rrs[i].sort_pos)
-                                               || (ntohs(context.naptr_rrs[k].naptr.pref) > ntohs(context.naptr_rrs[i].naptr.pref)
-                                                       && context.naptr_rrs[k].sort_pos < context.naptr_rrs[i].sort_pos)){
-                                               z = context.naptr_rrs[k].sort_pos;
-                                               context.naptr_rrs[k].sort_pos = context.naptr_rrs[i].sort_pos;
-                                               context.naptr_rrs[i].sort_pos = z;
-                                       }
-                               }
-                       }
-               }
-               for (k=0; k<context.naptr_rrs_count; k++) {
-                       if (context.naptr_rrs[k].sort_pos == context.position-1) {
-                               ast_copy_string(context.dst, context.naptr_rrs[k].result, dstlen);
-                               ast_copy_string(context.tech, context.naptr_rrs[k].tech, techlen);
-                               break;
-                       }
-               }
-       } else if (!(context.options & ENUMLOOKUP_OPTIONS_COUNT)) {
-               context.dst[0] = 0;
-       }
+	if (context.naptr_rrs_count >= context.position && ! (context.options & ENUMLOOKUP_OPTIONS_COUNT)) {
+		/* sort array by NAPTR order/preference/tech */
+		for (k = 0; k < context.naptr_rrs_count; k++) {
+			for (i = 0; i < context.naptr_rrs_count; i++) {
+				/* Compare by order first. */
+				if ((ntohs(context.naptr_rrs[k].naptr.order) < ntohs(context.naptr_rrs[i].naptr.order)
+						&& context.naptr_rrs[k].sort_pos > context.naptr_rrs[i].sort_pos)
+					|| (ntohs(context.naptr_rrs[k].naptr.order) > ntohs(context.naptr_rrs[i].naptr.order)
+						&& context.naptr_rrs[k].sort_pos < context.naptr_rrs[i].sort_pos)){
+					z = context.naptr_rrs[k].sort_pos;
+					context.naptr_rrs[k].sort_pos = context.naptr_rrs[i].sort_pos;
+					context.naptr_rrs[i].sort_pos = z;
+				} else if (ntohs(context.naptr_rrs[k].naptr.order) == ntohs(context.naptr_rrs[i].naptr.order)) {
+					/* Order is the same, so sort by preference next */
+					if (ntohs(context.naptr_rrs[k].naptr.pref) == ntohs(context.naptr_rrs[i].naptr.pref)) {
+						/* Preference is the same, so sort by tech */
+						if ((strcmp(context.naptr_rrs[k].tech, context.naptr_rrs[i].tech) < 0
+								&& context.naptr_rrs[k].sort_pos > context.naptr_rrs[i].sort_pos)
+							|| (strcmp(context.naptr_rrs[k].tech, context.naptr_rrs[i].tech) > 0
+								&& context.naptr_rrs[k].sort_pos < context.naptr_rrs[i].sort_pos)) {
+							z = context.naptr_rrs[k].sort_pos;
+							context.naptr_rrs[k].sort_pos = context.naptr_rrs[i].sort_pos;
+							context.naptr_rrs[i].sort_pos = z;
+						}
+					} else if ((ntohs(context.naptr_rrs[k].naptr.pref) < ntohs(context.naptr_rrs[i].naptr.pref)
+							&& context.naptr_rrs[k].sort_pos > context.naptr_rrs[i].sort_pos)
+						|| (ntohs(context.naptr_rrs[k].naptr.pref) > ntohs(context.naptr_rrs[i].naptr.pref)
+							&& context.naptr_rrs[k].sort_pos < context.naptr_rrs[i].sort_pos)){
+						z = context.naptr_rrs[k].sort_pos;
+						context.naptr_rrs[k].sort_pos = context.naptr_rrs[i].sort_pos;
+						context.naptr_rrs[i].sort_pos = z;
+					}
+				}
+			}
+		}
+		for (k = 0; k < context.naptr_rrs_count; k++) {
+			if (context.naptr_rrs[k].sort_pos == context.position - 1) {
+				ast_copy_string(context.dst, context.naptr_rrs[k].result, dstlen);
+				ast_copy_string(context.tech, context.naptr_rrs[k].tech, techlen);
+				break;
+			}
+		}
+	} else if (!(context.options & ENUMLOOKUP_OPTIONS_COUNT)) {
+		context.dst[0] = 0;
+	}
 
 	if (chan)
 		ret |= ast_autoservice_stop(chan);

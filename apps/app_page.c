@@ -31,7 +31,7 @@
 
 #include "asterisk.h"
 
-ASTERISK_FILE_VERSION(__FILE__, "$Revision: 19812 $")
+ASTERISK_FILE_VERSION(__FILE__, "$Revision: 55588 $")
 
 #include "asterisk/options.h"
 #include "asterisk/logger.h"
@@ -56,7 +56,7 @@ static const char *page_descrip =
 "caller is dumped into the conference as a speaker and the room is\n"
 "destroyed when the original caller leaves.  Valid options are:\n"
 "        d - full duplex audio\n"
-"	 q - quiet, do not play beep to caller\n";
+"        q - quiet, do not play beep to caller\n";
 
 STANDARD_LOCAL_USER;
 
@@ -135,6 +135,7 @@ static void launch_page(struct ast_channel *chan, const char *meetmeopts, const 
 			ast_log(LOG_WARNING, "Unable to create paging thread: %s\n", strerror(errno));
 			free(cd);
 		}
+		pthread_attr_destroy(&attr);
 	}
 }
 
@@ -179,7 +180,7 @@ static int page_exec(struct ast_channel *chan, void *data)
 	if (options)
 		ast_app_parse_options(page_opts, &flags, NULL, options);
 
-	snprintf(meetmeopts, sizeof(meetmeopts), "%ud|%sqxdw", confid, ast_test_flag(&flags, PAGE_DUPLEX) ? "" : "m");
+	snprintf(meetmeopts, sizeof(meetmeopts), "%ud|%sqxdw(5)", confid, ast_test_flag(&flags, PAGE_DUPLEX) ? "" : "m");
 
 	while ((tech = strsep(&tmp, "&"))) {
 		/* don't call the originating device */

@@ -34,7 +34,7 @@
 
 #include "asterisk.h"
 
-ASTERISK_FILE_VERSION(__FILE__, "$Revision: 19768 $")
+ASTERISK_FILE_VERSION(__FILE__, "$Revision: 62737 $")
 
 #include "asterisk/lock.h"
 #include "asterisk/cli.h"
@@ -258,7 +258,8 @@ static struct pbx_builtin {
 	"Answer a channel if ringing", 
 	"  Answer([delay]): If the call has not been answered, this application will\n"
 	"answer it. Otherwise, it has no effect on the call. If a delay is specified,\n"
-	"Asterisk will wait this number of milliseconds before answering the call.\n"
+	"Asterisk will wait this number of milliseconds before returning to\n"
+	"the dialplan after answering the call.\n"
 	},
 
 	{ "BackGround", pbx_builtin_background,
@@ -314,32 +315,52 @@ static struct pbx_builtin {
 
 	{ "Goto", pbx_builtin_goto, 
 	"Jump to a particular priority, extension, or context",
-	"  Goto([[context|]extension|]priority): This application will cause the\n"
-	"calling channel to continue dialplan execution at the specified priority.\n"
+	"  Goto([[context|]extension|]priority): This application will set the current\n"
+	"context, extension, and priority in the channel structure. After it completes, the\n"
+	"pbx engine will continue dialplan execution at the specified location.\n"
 	"If no specific extension, or extension and context, are specified, then this\n"
-	"application will jump to the specified priority of the current extension.\n"
-	"  If the attempt to jump to another location in the dialplan is not successful,\n"
-	"then the channel will continue at the next priority of the current extension.\n"
+	"application will just set the specified priority of the current extension.\n"
+	"  At least a priority is required as an argument, or the goto will return a -1,\n"
+	"and the channel and call will be terminated.\n"
+	"  If the location that is put into the channel information is bogus, and asterisk cannot\n"
+        "find that location in the dialplan,\n"
+	"then the execution engine will try to find and execute the code in the 'i' (invalid)\n"
+	"extension in the current context. If that does not exist, it will try to execute the\n"
+	"'h' extension. If either or neither the 'h' or 'i' extensions have been defined, the\n"
+	"channel is hung up, and the execution of instructions on the channel is terminated.\n"
+	"What this means is that, for example, you specify a context that does not exist, then\n"
+	"it will not be possible to find the 'h' or 'i' extensions, and the call will terminate!\n"
 	},
 
 	{ "GotoIf", pbx_builtin_gotoif,
 	"Conditional goto",
-	"  GotoIf(condition?[labeliftrue]:[labeliffalse]): This application will cause\n"
-	"the calling channel to jump to the specified location in the dialplan based on\n"
-	"the evaluation of the given condition. The channel will continue at\n"
+	"  GotoIf(condition?[labeliftrue]:[labeliffalse]): This application will set the current\n"
+	"context, extension, and priority in the channel structure based on the evaluation of\n"
+	"the given condition. After this application completes, the\n"
+	"pbx engine will continue dialplan execution at the specified location in the dialplan.\n"
+	"The channel will continue at\n"
 	"'labeliftrue' if the condition is true, or 'labeliffalse' if the condition is\n"
 	"false. The labels are specified with the same syntax as used within the Goto\n"
 	"application.  If the label chosen by the condition is omitted, no jump is\n"
-	"performed, but execution continues with the next priority in the dialplan.\n"
+	"performed, and the execution passes to the next instruction.\n"
+	"If the target location is bogus, and does not exist, the execution engine will try \n"
+	"to find and execute the code in the 'i' (invalid)\n"
+	"extension in the current context. If that does not exist, it will try to execute the\n"
+	"'h' extension. If either or neither the 'h' or 'i' extensions have been defined, the\n"
+	"channel is hung up, and the execution of instructions on the channel is terminated.\n"
+	"Remember that this command can set the current context, and if the context specified\n"
+	"does not exist, then it will not be able to find any 'h' or 'i' extensions there,\n"
+	"and the channel and call will both be terminated!\n"
 	},
 
 	{ "GotoIfTime", pbx_builtin_gotoiftime,
 	"Conditional Goto based on the current time",
 	"  GotoIfTime(<times>|<weekdays>|<mdays>|<months>?[[context|]exten|]priority):\n"
-	"This application will have the calling channel jump to the speicified location\n"
-	"int the dialplan if the current time matches the given time specification.\n"
+	"This application will set the context, extension, and priority in the channel structure\n"
+	"if the current time matches the given time specification. Otherwise, nothing is done.\n"
 	"Further information on the time specification can be found in examples\n"
 	"illustrating how to do time-based context includes in the dialplan.\n" 
+	"If the target jump location is bogus, Asterisk will respond as outlined in Goto.\n"
 	},
 
 	{ "ExecIfTime", pbx_builtin_execiftime,
@@ -541,7 +562,7 @@ int pbx_exec(struct ast_channel *c, 		/*!< Channel */
 	int (*execute)(struct ast_channel *chan, void *data) = app->execute; 
 
 	if (newstack) {
-		if (c->cdr)
+		if (c->cdr && !ast_check_hangup(c))
 			ast_cdr_setapp(c->cdr, app->name, data);
 
 		/* save channel values */
@@ -973,8 +994,7 @@ static char *substring(const char *value, int offset, int length, char *workspac
 	return ret;
 }
 
-/*! \brief  pbx_retrieve_variable: Support for Asterisk built-in variables and
-      functions in the dialplan
+/*! \brief  pbx_retrieve_variable: Support for Asterisk built-in variables
   ---*/
 void pbx_retrieve_variable(struct ast_channel *c, const char *var, char **ret, char *workspace, int workspacelen, struct varshead *headp)
 {
@@ -1172,10 +1192,12 @@ static int handle_show_functions(int fd, int argc, char *argv[])
 	int count_acf = 0;
 
 	ast_cli(fd, "Installed Custom Functions:\n--------------------------------------------------------------------------------\n");
+	ast_mutex_lock(&acflock);
 	for (acf = acf_root ; acf; acf = acf->next) {
 		ast_cli(fd, "%-20.20s  %-35.35s  %s\n", acf->name, acf->syntax, acf->synopsis);
 		count_acf++;
 	}
+	ast_mutex_unlock(&acflock);
 	ast_cli(fd, "%d custom functions installed.\n", count_acf);
 	return 0;
 }
@@ -1471,9 +1493,10 @@ static void pbx_substitute_variables_helper_full(struct ast_channel *c, struct v
 			needsub = 0;
 
 			/* Find the end of it */
-			while(brackets && *vare) {
+			while (brackets && *vare) {
 				if ((vare[0] == '$') && (vare[1] == '{')) {
 					needsub++;
+				} else if (vare[0] == '{') {
 					brackets++;
 				} else if (vare[0] == '}') {
 					brackets--;
@@ -2304,14 +2327,14 @@ static int __ast_pbx_run(struct ast_channel *c)
 				case AST_PBX_KEEPALIVE:
 					if (option_debug)
 						ast_log(LOG_DEBUG, "Spawn extension (%s,%s,%d) exited KEEPALIVE on '%s'\n", c->context, c->exten, c->priority, c->name);
-					else if (option_verbose > 1)
+					if (option_verbose > 1)
 						ast_verbose( VERBOSE_PREFIX_2 "Spawn extension (%s, %s, %d) exited KEEPALIVE on '%s'\n", c->context, c->exten, c->priority, c->name);
 					goto out;
 					break;
 				default:
 					if (option_debug)
 						ast_log(LOG_DEBUG, "Spawn extension (%s,%s,%d) exited non-zero on '%s'\n", c->context, c->exten, c->priority, c->name);
-					else if (option_verbose > 1)
+					if (option_verbose > 1)
 						ast_verbose( VERBOSE_PREFIX_2 "Spawn extension (%s, %s, %d) exited non-zero on '%s'\n", c->context, c->exten, c->priority, c->name);
 					if (c->_softhangup == AST_SOFTHANGUP_ASYNCGOTO) {
 						c->_softhangup =0;
@@ -2449,7 +2472,7 @@ out:
 				/* Something bad happened, or a hangup has been requested. */
 				if (option_debug)
 					ast_log(LOG_DEBUG, "Spawn extension (%s,%s,%d) exited non-zero on '%s'\n", c->context, c->exten, c->priority, c->name);
-				else if (option_verbose > 1)
+				if (option_verbose > 1)
 					ast_verbose( VERBOSE_PREFIX_2 "Spawn extension (%s, %s, %d) exited non-zero on '%s'\n", c->context, c->exten, c->priority, c->name);
 				break;
 			}
@@ -2537,8 +2560,10 @@ enum ast_pbx_result ast_pbx_start(struct ast_channel *c)
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
 	if (ast_pthread_create(&t, &attr, pbx_thread, c)) {
 		ast_log(LOG_WARNING, "Failed to create new channel thread\n");
+		pthread_attr_destroy(&attr);
 		return AST_PBX_FAILED;
 	}
+	pthread_attr_destroy(&attr);
 
 	return AST_PBX_SUCCESS;
 }
@@ -3649,7 +3674,6 @@ struct ast_context *ast_context_create(struct ast_context **extcontexts, const c
 	tmp = *local_contexts;
 	while(tmp) {
 		if (!strcasecmp(tmp->name, name)) {
-			ast_mutex_unlock(&conlock);
 			ast_log(LOG_WARNING, "Tried to register context '%s', already in use\n", name);
 			if (!extcontexts)
 				ast_mutex_unlock(&conlock);
@@ -3670,7 +3694,7 @@ struct ast_context *ast_context_create(struct ast_context **extcontexts, const c
 		*local_contexts = tmp;
 		if (option_debug)
 			ast_log(LOG_DEBUG, "Registered context '%s'\n", tmp->name);
-		else if (option_verbose > 2)
+		if (option_verbose > 2)
 			ast_verbose( VERBOSE_PREFIX_3 "Registered extension context '%s'\n", tmp->name);
 	} else
 		ast_log(LOG_ERROR, "Out of memory\n");
@@ -3703,6 +3727,7 @@ void ast_merge_contexts_and_delete(struct ast_context **extcontexts, const char 
 	int length;
 	struct ast_state_cb *thiscb, *prevcb;
 
+	memset(&store, 0, sizeof(store));
 	AST_LIST_HEAD_INIT(&store);
 
 	/* it is very important that this function hold the hintlock _and_ the conlock
@@ -4061,7 +4086,7 @@ static unsigned int get_month(char *mon)
 	}
 	if (c) {
 		e = 0;
-		while((e < 12) && strcasecmp(mon, months[e])) e++;
+		while((e < 12) && strcasecmp(c, months[e])) e++;
 		if (e >= 12) {
 			ast_log(LOG_WARNING, "Invalid month '%s', assuming none\n", c);
 			return 0;
@@ -4650,7 +4675,8 @@ int ast_add_extension2(struct ast_context *con,
 		} else { \
 			ast_log(LOG_DEBUG, "Added extension '%s' priority %d to %s\n", tmp->exten, tmp->priority, con->name); \
 		} \
-	} else if (option_verbose > 2) { \
+	} \
+	if (option_verbose > 2) { \
 		if (tmp->matchcid) { \
 			ast_verbose( VERBOSE_PREFIX_3 "Added extension '%s' priority %d (CID match '%s')to %s\n", tmp->exten, tmp->priority, tmp->cidmatch, con->name); \
 		} else {  \
@@ -4904,8 +4930,10 @@ static void *async_wait(void *data)
 			break;
 		if (f->frametype == AST_FRAME_CONTROL) {
 			if ((f->subclass == AST_CONTROL_BUSY)  ||
-				(f->subclass == AST_CONTROL_CONGESTION) )
-					break;
+			    (f->subclass == AST_CONTROL_CONGESTION) ) {
+				ast_frfree(f);
+				break;
+			}
 		}
 		ast_frfree(f);
 	}
@@ -5118,8 +5146,10 @@ int ast_pbx_outgoing_exten(const char *type, int format, void *data, int timeout
 			}
 			ast_hangup(chan);
 			res = -1;
+			pthread_attr_destroy(&attr);
 			goto outgoing_exten_cleanup;
 		}
+		pthread_attr_destroy(&attr);
 		res = 0;
 	}
 outgoing_exten_cleanup:
@@ -5221,6 +5251,7 @@ int ast_pbx_outgoing_app(const char *type, int format, void *data, int timeout, 
 							if (locked_channel) 
 								*locked_channel = chan;
 						}
+						pthread_attr_destroy(&attr);
 					}
 				} else {
 					ast_log(LOG_ERROR, "Out of memory :(\n");
@@ -5283,11 +5314,13 @@ int ast_pbx_outgoing_app(const char *type, int format, void *data, int timeout, 
 				ast_mutex_unlock(&chan->lock);
 			ast_hangup(chan);
 			res = -1;
+			pthread_attr_destroy(&attr);
 			goto outgoing_app_cleanup;
 		} else {
 			if (locked_channel)
 				*locked_channel = chan;
 		}
+		pthread_attr_destroy(&attr);
 		res = 0;
 	}
 outgoing_app_cleanup:
@@ -5427,7 +5460,8 @@ static int pbx_builtin_ringing(struct ast_channel *chan, void *data)
 static int pbx_builtin_busy(struct ast_channel *chan, void *data)
 {
 	ast_indicate(chan, AST_CONTROL_BUSY);		
-	ast_setstate(chan, AST_STATE_BUSY);
+	if (chan->_state != AST_STATE_UP)
+		ast_setstate(chan, AST_STATE_BUSY);
 	wait_for_hangup(chan, data);
 	return -1;
 }
@@ -5438,7 +5472,8 @@ static int pbx_builtin_busy(struct ast_channel *chan, void *data)
 static int pbx_builtin_congestion(struct ast_channel *chan, void *data)
 {
 	ast_indicate(chan, AST_CONTROL_CONGESTION);
-	ast_setstate(chan, AST_STATE_BUSY);
+	if (chan->_state != AST_STATE_UP)
+		ast_setstate(chan, AST_STATE_BUSY);
 	wait_for_hangup(chan, data);
 	return -1;
 }
@@ -5737,7 +5772,7 @@ static int pbx_builtin_background(struct ast_channel *chan, void *data)
 			break;
 		default:
 			ast_log(LOG_WARNING, "Background requires an argument (filename)\n");
-			break;
+			return -1;
 		}
 	}
 
@@ -5899,9 +5934,7 @@ int pbx_builtin_serialize_variables(struct ast_channel *chan, char *buf, size_t 
 	memset(buf, 0, size);
 
 	AST_LIST_TRAVERSE(&chan->varshead, variables, entries) {
-		if(variables &&
-		   (var=ast_var_name(variables)) && (val=ast_var_value(variables)) &&
-		   !ast_strlen_zero(var) && !ast_strlen_zero(val)) {
+		if ((var = ast_var_name(variables)) && (val = ast_var_value(variables))) {
 			if (ast_build_string(&buf, &size, "%s=%s\n", var, val)) {
 				ast_log(LOG_ERROR, "Data Buffer Size Exceeded!\n");
 				break;

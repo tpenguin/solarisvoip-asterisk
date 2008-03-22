@@ -6,7 +6,8 @@
  * Contributors:
  * Steve Kann <stevek@stevek.com>
  *
- * Copyright on this file is disclaimed to Digium for inclusion in Asterisk
+ * A license has been granted to Digium (via disclaimer) for the use of
+ * this code.
  *
  * See http://www.asterisk.org for more information about
  * the Asterisk project. Please do not directly contact
@@ -32,7 +33,7 @@
 
 #include "asterisk.h"
 
-ASTERISK_FILE_VERSION(__FILE__, "$Revision: 10368 $")
+ASTERISK_FILE_VERSION(__FILE__, "$Revision: 52264 $")
 
 #include "jitterbuf.h"
 
@@ -761,8 +762,8 @@ long jb_next(jitterbuf *jb)
 {
     if (jb == NULL) return JB_LONGMAX;
 	if (jb->info.silence_begin_ts) {
-		long next = queue_next(jb);
-		if (next > 0) { 
+		if (jb->frames) {
+			long next = queue_next(jb);
 			history_get(jb);
 			/* shrink during silence */
 			if (jb->info.target - jb->info.current < -JB_TARGET_EXTRA)

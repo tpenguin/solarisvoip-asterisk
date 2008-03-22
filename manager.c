@@ -46,7 +46,7 @@
 
 #include "asterisk.h"
 
-ASTERISK_FILE_VERSION(__FILE__, "$Revision: 9581 $")
+ASTERISK_FILE_VERSION(__FILE__, "$Revision: 71288 $")
 
 #include "asterisk/channel.h"
 #include "asterisk/file.h"
@@ -533,7 +533,7 @@ static int authenticate(struct mansession *s, struct message *m)
 				} else if (ha)
 					ast_free_ha(ha);
 				if (!strcasecmp(authtype, "MD5")) {
-					if (!ast_strlen_zero(key) &&
+					if (!ast_strlen_zero(key) && 
 					    !ast_strlen_zero(s->challenge) && !ast_strlen_zero(password)) {
 						int x;
 						int len=0;
@@ -723,11 +723,6 @@ static int action_setvar(struct mansession *s, struct message *m)
 		return 0;
 	}
 	
-	if (ast_strlen_zero(varval)) {
-		astman_send_error(s, m, "No value specified");
-		return 0;
-	}
-
 	if (!ast_strlen_zero(name)) {
 		c = ast_get_channel_by_name_locked(name);
 		if (!c) {
@@ -736,7 +731,7 @@ static int action_setvar(struct mansession *s, struct message *m)
 		}
 	}
 	
-	pbx_builtin_setvar_helper(c, varname, varval);
+	pbx_builtin_setvar_helper(c, varname, varval ? varval : "");
 	  
 	if (c)
 		ast_mutex_unlock(&c->lock);
@@ -805,7 +800,6 @@ static int action_status(struct mansession *s, struct message *m)
 	long elapsed_seconds=0;
 	int all = ast_strlen_zero(name); /* set if we want all channels */
 
-	astman_send_ack(s, m, "Channel status will follow");
         if (!ast_strlen_zero(id))
                 snprintf(idText,256,"ActionID: %s\r\n",id);
 	if (all)
@@ -817,6 +811,7 @@ static int action_status(struct mansession *s, struct message *m)
 			return 0;
 		}
 	}
+	astman_send_ack(s, m, "Channel status will follow");
 	/* if we look by name, we break after the first iteration */
 	while(c) {
 		if (c->_bridge)
@@ -917,8 +912,19 @@ static int action_redirect(struct mansession *s, struct message *m)
 		astman_send_error(s, m, buf);
 		return 0;
 	}
+	if (ast_check_hangup(chan)) {
+		astman_send_error(s, m, "Redirect failed, channel hung up.\n");
+		ast_mutex_unlock(&chan->lock);
+		return 0;
+	}
 	if (!ast_strlen_zero(name2))
 		chan2 = ast_get_channel_by_name_locked(name2);
+	if (chan2 && ast_check_hangup(chan2)) {
+		astman_send_error(s, m, "Redirect failed, extra channel hung up.\n");
+		ast_mutex_unlock(&chan->lock);
+		ast_mutex_unlock(&chan2->lock);
+		return 0;
+	}
 	res = ast_async_goto(chan, context, exten, pi);
 	if (!res) {
 		if (!ast_strlen_zero(name2)) {
@@ -1109,6 +1115,7 @@ static int action_originate(struct mansession *s, struct message *m)
 			} else {
 				res = 0;
 			}
+			pthread_attr_destroy(&attr);
 		}
 	} else if (!ast_strlen_zero(app)) {
         	res = ast_pbx_outgoing_app(tech, AST_FORMAT_SLINEAR, data, to, app, appdata, &reason, 1, l, n, vars, account, NULL);

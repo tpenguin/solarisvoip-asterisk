@@ -41,7 +41,7 @@
 
 #include "asterisk.h"
 
-ASTERISK_FILE_VERSION(__FILE__, "$Revision: 7221 $")
+ASTERISK_FILE_VERSION(__FILE__, "$Revision: 33449 $")
 
 #include "asterisk/lock.h"
 #include "asterisk/file.h"
@@ -212,6 +212,7 @@ zapretry:
 				break;
 			if ((f->frametype == AST_FRAME_DTMF) && (f->subclass == '#')) {
 				ret = 0;
+				ast_frfree(f);
 				break;
 			} else if (fd != chan->fds[0]) {
 				if (f->frametype == AST_FRAME_VOICE) {

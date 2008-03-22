@@ -29,7 +29,7 @@
 
 #include "asterisk.h"
 
-ASTERISK_FILE_VERSION(__FILE__, "$Revision: 7221 $")
+ASTERISK_FILE_VERSION(__FILE__, "$Revision: 24669 $")
 
 #include "asterisk/options.h"
 #include "asterisk/logger.h"
@@ -63,7 +63,7 @@ static int verbose_exec(struct ast_channel *chan, void *data)
 	if (data) {
 		vtext = ast_strdupa((char *)data);
 		if (vtext) {
-			char *tmp = strsep(&vtext, "|,");
+			char *tmp = strsep(&vtext, "|");
 			if (vtext) {
 				if (sscanf(tmp, "%d", &vsize) != 1) {
 					vsize = 0;

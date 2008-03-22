@@ -44,7 +44,7 @@
 
 #include "asterisk.h"
 
-ASTERISK_FILE_VERSION(__FILE__, "$Revision: 7221 $")
+ASTERISK_FILE_VERSION(__FILE__, "$Revision: 75449 $")
 
 #include "asterisk/lock.h"
 #include "asterisk/channel.h"
@@ -682,7 +682,6 @@ static int ourport;
 static struct in_addr __ourip;
 struct ast_hostent ahp; struct hostent *hp;
 static int skinnysock  = -1;
-static pthread_t tcp_thread;
 static pthread_t accept_t;
 static char context[AST_MAX_CONTEXT] = "default";
 static char language[MAX_LANGUAGE] = "";
@@ -1609,7 +1608,7 @@ static struct skinny_device *build_device(char *cat, struct ast_variable *v)
                        					l->sub = sub;
                        				} else {
                        					/* XXX Should find a way to clean up our memory */
-                       					ast_log(LOG_WARNING, "Out of memory allocating subchannel");
+                       					ast_log(LOG_WARNING, "Out of memory allocating subchannel\n");
                       					return NULL;
                        				}
                     			}
@@ -1617,7 +1616,7 @@ static struct skinny_device *build_device(char *cat, struct ast_variable *v)
 					d->lines = l;			
 	    			} else {
 			        	/* XXX Should find a way to clean up our memory */
-                    			ast_log(LOG_WARNING, "Out of memory allocating line");
+                    			ast_log(LOG_WARNING, "Out of memory allocating line\n");
                     			return NULL;
 				}
 			} else {
@@ -1741,11 +1740,12 @@ static void *skinny_ss(void *data)
                     			getforward = 0;
                 		} else  {
                     			strncpy(chan->exten, exten, sizeof(chan->exten)-1);
+
                     			if (!ast_strlen_zero(l->cid_num)) {
-                        			if (!l->hidecallerid) {
-                            				chan->cid.cid_num = strdup(l->cid_num);
-                        				chan->cid.cid_ani = strdup(l->cid_num);
-                    				}
+						ast_set_callerid(chan,
+							l->hidecallerid ? "" : l->cid_num,
+							l->hidecallerid ? "" : l->cid_name,
+							NULL);
                     				ast_setstate(chan, AST_STATE_RING);
                     				res = ast_pbx_run(chan);
                     				if (res) {
@@ -1792,14 +1792,7 @@ static void *skinny_ss(void *data)
             		}
 		       	/* Disable Caller*ID if enabled */
 		        l->hidecallerid = 1;
-       			if (chan->cid.cid_num) {
-	               		free(chan->cid.cid_num);
-	    		}
-	            	chan->cid.cid_num = NULL;
-	   		if (chan->cid.cid_name) {
-               			free(chan->cid.cid_name);
-	    		}
-	      		chan->cid.cid_name = NULL;
+			ast_set_callerid(chan, "", "", NULL);
             		transmit_tone(s, SKINNY_DIALTONE);
        			len = 0;
            		memset(exten, 0, sizeof(exten));
@@ -1873,18 +1866,7 @@ static void *skinny_ss(void *data)
        			}
        			/* Enable Caller*ID if enabled */
        			l->hidecallerid = 0;
-       			if (chan->cid.cid_num) {
-              			free(chan->cid.cid_num);	
-    			}
-            		if (!ast_strlen_zero(l->cid_num)) {
-                		chan->cid.cid_num = strdup(l->cid_num);
-	    		}
-      			if (chan->cid.cid_name) {
-               			free(chan->cid.cid_name);
-    			}
-            		if (!ast_strlen_zero(l->cid_name)) {
-               			chan->cid.cid_name = strdup(l->cid_name);	
-			}
+			ast_set_callerid(chan, l->cid_num, l->cid_name, NULL);
             		transmit_tone(s, SKINNY_DIALTONE);
             		len = 0;
             		memset(exten, 0, sizeof(exten));
@@ -2296,12 +2278,12 @@ static struct ast_channel *skinny_new(struct skinny_subchannel *sub, int state)
 		strncpy(tmp->call_forward, l->call_forward, sizeof(tmp->call_forward) - 1);
 		strncpy(tmp->context, l->context, sizeof(tmp->context)-1);
 		strncpy(tmp->exten,l->exten, sizeof(tmp->exten)-1);
-		if (!ast_strlen_zero(l->cid_num)) {
+
+		if (!ast_strlen_zero(l->cid_num))
 			tmp->cid.cid_num = strdup(l->cid_num);
-		}
-		if (!ast_strlen_zero(l->cid_name)) {
+		if (!ast_strlen_zero(l->cid_name))
 			tmp->cid.cid_name = strdup(l->cid_name);
-		}
+
 		tmp->priority = 1;
 		tmp->adsicpe = AST_ADSI_UNAVAILABLE;
 
@@ -2884,12 +2866,15 @@ static int get_input(struct skinnysession *s)
 			ast_log(LOG_WARNING, "Skinny Client sent invalid data.\n");
 			return -1;
 		}
+		if (dlen < 4) {
+			ast_log(LOG_WARNING, "Skinny Client sent invalid data.\n");
+			return -1;
+		}
 		if (dlen+8 > sizeof(s->inbuf)) {
 			dlen = sizeof(s->inbuf) - 8;
 		}
 		*(int *)(void *)s->inbuf = htolel(dlen);
 		res = read(s->fd, s->inbuf+4, dlen+4);
-		ast_mutex_unlock(&s->lock);
 		if (res != (dlen+4)) {
 			ast_log(LOG_WARNING, "Skinny Client sent less data than expected.\n");
 			return -1;
@@ -2956,6 +2941,7 @@ static void *accept_thread(void *ignore)
 	struct protoent *p;
 	int arg = 1;
 	pthread_attr_t attr;
+	pthread_t tcp_thread;
 
 	pthread_attr_init(&attr);
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
@@ -2987,7 +2973,7 @@ static void *accept_thread(void *ignore)
 		sessions = s;
 		ast_mutex_unlock(&sessionlock);
 		
-		if (ast_pthread_create(&tcp_thread, NULL, skinny_session, s)) {
+		if (ast_pthread_create(&tcp_thread, &attr, skinny_session, s)) {
 			destroy_session(s);
 		}
 	}
@@ -2995,6 +2981,7 @@ static void *accept_thread(void *ignore)
 		ast_verbose("killing accept thread\n");
 	}
 	close(as);
+	pthread_attr_destroy(&attr);
 	return 0;
 }
 
@@ -3199,7 +3186,7 @@ static int reload_config(void)
 	if (skinnysock < 0) {
 		skinnysock = socket(AF_INET, SOCK_STREAM, 0);
 		if(setsockopt(skinnysock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)) == -1) {
-			ast_log(LOG_ERROR, "Set Socket Options failed: errno %d, %s", errno, strerror(errno));
+			ast_log(LOG_ERROR, "Set Socket Options failed: errno %d, %s\n", errno, strerror(errno));
 			ast_config_destroy(cfg);
 			return 0;
 		}
@@ -3236,7 +3223,7 @@ static int reload_config(void)
 	return 0;
 }
 
-void delete_devices(void)
+static void delete_devices(void)
 {
 	struct skinny_device *d, *dlast;
 	struct skinny_line *l, *llast;

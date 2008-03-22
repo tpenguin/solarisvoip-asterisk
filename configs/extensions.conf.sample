@@ -107,7 +107,7 @@ TRUNKMSD=1					; MSD digits to strip (usually 1 or 0)
 ;
 ; For example the extension _NXXXXXX would match normal 7 digit dialings, 
 ; while _1NXXNXXXXXX would represent an area code plus phone number
-; preceeded by a one.
+; preceded by a one.
 ;
 ; Each step of an extension is ordered by priority, which must
 ; always start with 1 to be considered a valid extension.  The priority
@@ -154,7 +154,7 @@ TRUNKMSD=1					; MSD digits to strip (usually 1 or 0)
 ;
 ; List canonical entries here
 ;
-;exten => 12564286000,1,Macro(std-exten,6000,IAX2/foo)
+;exten => 12564286000,1,Macro(stdexten,6000,IAX2/foo)
 ;exten => _125642860XX,1,Dial(IAX2/otherbox/${EXTEN:7})
 
 [dundi-e164-customers]
@@ -214,7 +214,7 @@ include => dundi-e164-lookup
 exten => _91700XXXXXXX,1,Dial(IAX2/${IAXINFO}@iaxtel.com/${EXTEN:1}@iaxtel)
 
 ;
-; The SWITCH statement permits a server to share the dialplain with
+; The SWITCH statement permits a server to share the dialplan with
 ; another server. Use with care: Reciprocal switch statements are not
 ; allowed (e.g. both A -> B and B -> A), and the switched server needs
 ; to be on-line or else dialing can be severly delayed.
@@ -392,12 +392,12 @@ exten => i,1,Playback(invalid)		; "That's not valid, try again"
 ; Asterisk demo.
 ;
 exten => 500,1,Playback(demo-abouttotry); Let them know what's going on
-exten => 500,n,Dial(IAX2/guest@misery.digium.com/s@default)	; Call the Asterisk demo
+exten => 500,n,Dial(IAX2/guest@pbx.digium.com/s@default)	; Call the Asterisk demo
 exten => 500,n,Playback(demo-nogo)	; Couldn't connect to the demo site
 exten => 500,n,Goto(s,6)		; Return to the start over message.
 
 ;
-; Create an extension, 600, for evaulating echo latency.
+; Create an extension, 600, for evaluating echo latency.
 ;
 exten => 600,1,Playback(demo-echotest)	; Let them know what's going on
 exten => 600,n,Echo			; Do the echo test
@@ -442,12 +442,10 @@ exten => 8500,n,Goto(s,6)
 include => demo
 
 ;
-; Extensions like the two below can be used for FWD, Nikotel, sipgate etc.
-; Note that you must have a [sipprovider] section in sip.conf whereas
-; the otherprovider.net example does not require such a peer definition
+; An extension like the one below can be used for FWD, Nikotel, sipgate etc.
+; Note that you must have a [sipprovider] section in sip.conf
 ;
 ;exten => _41X.,1,Dial(SIP/${EXTEN:2}@sipprovider,,r)
-;exten => _42X.,1,Dial(SIP/user:passwd@${EXTEN:2}@otherprovider.net,30,rT)
 
 ; Real extensions would go here. Generally you want real extensions to be
 ; 4 or 5 digits long (although there is no such requirement) and start with a

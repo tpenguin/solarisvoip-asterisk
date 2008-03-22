@@ -34,7 +34,7 @@
 
 #include "asterisk.h"
 
-ASTERISK_FILE_VERSION(__FILE__, "$Revision: 7221 $")
+ASTERISK_FILE_VERSION(__FILE__, "$Revision: 37808 $")
 
 #include "asterisk/lock.h"
 #include "asterisk/channel.h"
@@ -58,7 +58,7 @@ struct ast_filestream {
 	struct ast_frame fr;				/* Frame information */
 	char waste[AST_FRIENDLY_OFFSET];	/* Buffer for sending frames, etc */
 	char empty;							/* Empty character */
-	unsigned char h263[4096];				/* Two Real h263 Frames */
+	unsigned char h263[32768];				/* Four real h263 Frames */
 };
 
 
@@ -161,6 +161,7 @@ static struct ast_frame *h263_read(struct ast_filestream *s, int *whennext)
 	len &= 0x7fff;
 	if (len > sizeof(s->h263)) {
 		ast_log(LOG_WARNING, "Length %d is too long\n", len);
+		return NULL;
 	}
 	if ((res = fread(s->h263, 1, len, s->f)) != len) {
 		if (res)

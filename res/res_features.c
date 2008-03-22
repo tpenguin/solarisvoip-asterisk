@@ -35,7 +35,7 @@
 
 #include "asterisk.h"
 
-ASTERISK_FILE_VERSION(__FILE__, "$Revision: 18866 $")
+ASTERISK_FILE_VERSION(__FILE__, "$Revision: 71124 $")
 
 #include "asterisk/lock.h"
 #include "asterisk/file.h"
@@ -383,12 +383,12 @@ int ast_park_call(struct ast_channel *chan, struct ast_channel *peer, int timeou
 			ast_log(LOG_ERROR, "Parking context '%s' does not exist and unable to create\n", parking_con);
 		}
 	}
+	if (peer) 
+		ast_say_digits(peer, pu->parkingnum, "", peer->language);
 	if (con) {
 		snprintf(exten, sizeof(exten), "%d", x);
 		ast_add_extension2(con, 1, exten, 1, NULL, NULL, parkedcall, strdup(exten), FREE, registrar);
 	}
-	if (peer) 
-		ast_say_digits(peer, pu->parkingnum, "", peer->language);
 	if (pu->notquiteyet) {
 		/* Wake up parking thread if we're really done */
 		ast_moh_start(pu->chan, NULL);
@@ -641,7 +641,7 @@ static int builtin_blindtransfer(struct ast_channel *chan, struct ast_channel *p
 			ast_verbose(VERBOSE_PREFIX_3 "Unable to find extension '%s' in context '%s'\n", newext, transferer_real_context);
 	}
 	if (!ast_strlen_zero(xferfailsound))
-		res = ast_streamfile(transferer, xferfailsound, transferee->language);
+		res = ast_streamfile(transferer, xferfailsound, transferer->language);
 	else
 		res = 0;
 	if (res) {
@@ -734,7 +734,7 @@ static int builtin_atxfer(struct ast_channel *chan, struct ast_channel *peer, st
 				ast_set_flag(&(bconfig.features_caller), AST_FEATURE_DISCONNECT);
 				ast_set_flag(&(bconfig.features_callee), AST_FEATURE_DISCONNECT);
 				res = ast_bridge_call(transferer,newchan,&bconfig);
-				if (newchan->_softhangup || newchan->_state != AST_STATE_UP || !transferer->_softhangup) {
+				if (newchan->_softhangup || !transferer->_softhangup) {
 					ast_hangup(newchan);
 					if (f) {
 						ast_frfree(f);
@@ -742,7 +742,7 @@ static int builtin_atxfer(struct ast_channel *chan, struct ast_channel *peer, st
 					}
 					if (!ast_strlen_zero(xfersound) && !ast_streamfile(transferer, xfersound, transferer->language)) {
 						if (ast_waitstream(transferer, "") < 0) {
-							ast_log(LOG_WARNING, "Failed to play courtesy tone!\n");
+							ast_log(LOG_WARNING, "Failed to play transfer sound!\n");
 						}
 					}
 					ast_moh_stop(transferee);
@@ -761,6 +761,7 @@ static int builtin_atxfer(struct ast_channel *chan, struct ast_channel *peer, st
 				
 				
 				ast_moh_stop(transferee);
+				ast_indicate(transferee, AST_CONTROL_UNHOLD);
 				
 				if ((ast_autoservice_stop(transferee) < 0)
 				   || (ast_waitfordigit(transferee, 100) < 0)
@@ -806,7 +807,7 @@ static int builtin_atxfer(struct ast_channel *chan, struct ast_channel *peer, st
 	
 					if (!ast_strlen_zero(xfersound) && !ast_streamfile(newchan, xfersound, newchan->language)) {
 						if (ast_waitstream(newchan, "") < 0) {
-							ast_log(LOG_WARNING, "Failed to play courtesy tone!\n");
+							ast_log(LOG_WARNING, "Failed to play transfer sound!\n");
 						}
 					}
 					ast_bridge_call_thread_launch(tobj);
@@ -842,6 +843,9 @@ static int builtin_atxfer(struct ast_channel *chan, struct ast_channel *peer, st
 		}
 	}  else {
 		ast_log(LOG_WARNING, "Did not read data.\n");
+		ast_moh_stop(transferee);
+		ast_autoservice_stop(transferee);
+		ast_indicate(transferee, AST_CONTROL_UNHOLD);
 		res = ast_streamfile(transferer, "beeperr", transferer->language);
 		if (ast_waitstream(transferer, "") < 0) {
 			return -1;
@@ -866,7 +870,7 @@ struct ast_call_feature builtin_features[] =
 };
 
 
-static AST_LIST_HEAD(feature_list,ast_call_feature) feature_list;
+static AST_LIST_HEAD_STATIC(feature_list,ast_call_feature);
 
 /* register new feature into feature_list*/
 void ast_register_feature(struct ast_call_feature *feature)
@@ -944,8 +948,12 @@ static int feature_exec_app(struct ast_channel *chan, struct ast_channel *peer, 
 		if (ast_test_flag(feature, AST_FEATURE_FLAG_CALLEE))
 			work = peer;
 		res = pbx_exec(work, app, feature->app_args, 1);
-		if (res < 0)
-			return res; 
+		if (res == AST_PBX_KEEPALIVE)
+			return FEATURE_RETURN_PBX_KEEPALIVE;
+		else if (res == AST_PBX_NO_HANGUP_PEER)
+			return FEATURE_RETURN_NO_HANGUP_PEER;
+		else if (res)
+			return FEATURE_RETURN_SUCCESSBREAK;
 	} else {
 		ast_log(LOG_WARNING, "Could not find application (%s)\n", feature->app);
 		return -2;
@@ -1021,7 +1029,10 @@ static int ast_feature_interpret(struct ast_channel *chan, struct ast_channel *p
 				if (!strcmp(feature->exten, code)) {
 					if (option_verbose > 2)
 						ast_verbose(VERBOSE_PREFIX_3 " Feature Found: %s exten: %s\n",feature->sname, tok);
-					res = feature->operation(chan, peer, config, code, sense);
+					if (sense == FEATURE_SENSE_CHAN)
+						res = feature->operation(chan, peer, config, code, sense);
+					else
+						res = feature->operation(peer, chan, config, code, sense);
 					break;
 				} else if (!strncmp(feature->exten, code, strlen(code))) {
 					res = FEATURE_RETURN_STOREDIGITS;
@@ -1264,7 +1275,6 @@ int ast_bridge_call(struct ast_channel *chan,struct ast_channel *peer,struct ast
 	int hasfeatures=0;
 	int hadfeatures=0;
 	struct ast_option_header *aoh;
-	struct timeval start = { 0 , 0 };
 	struct ast_bridge_config backup_config;
 	char *monitor_exec;
 
@@ -1313,14 +1323,11 @@ int ast_bridge_call(struct ast_channel *chan,struct ast_channel *peer,struct ast
 		peer->cdr = NULL;
 	}
 	for (;;) {
-		if (config->feature_timer)
-			start = ast_tvnow();
-
 		res = ast_channel_bridge(chan, peer, config, &f, &who);
 
 		if (config->feature_timer) {
 			/* Update time limit for next pass */
-			diff = ast_tvdiff_ms(ast_tvnow(), start);
+			diff = ast_tvdiff_ms(ast_tvnow(), config->start_time);
 			config->feature_timer -= diff;
 			if (hasfeatures) {
 				/* Running on backup config, meaning a feature might be being
@@ -1357,7 +1364,12 @@ int ast_bridge_call(struct ast_channel *chan,struct ast_channel *peer,struct ast
 					hadfeatures = hasfeatures;
 					/* Continue as we were */
 					continue;
-				}
+				} else if (!f) {
+					/* The bridge returned without a frame and there is a feature in progress.
+					 * However, we don't think the feature has quite yet timed out, so just
+					 * go back into the bridge. */
+					continue;
+ 				}
 			} else {
 				if (config->feature_timer <=0) {
 					/* We ran out of time */
@@ -1426,6 +1438,9 @@ int ast_bridge_call(struct ast_channel *chan,struct ast_channel *peer,struct ast
 				featurecode = peer_featurecode;
 			}
 			featurecode[strlen(featurecode)] = f->subclass;
+			/* Get rid of the frame before we start doing "stuff" with the channels */
+			ast_frfree(f);
+			f = NULL;
 			config->feature_timer = backup_config.feature_timer;
 			res = ast_feature_interpret(chan, peer, config, featurecode, sense);
 			switch(res) {
@@ -1438,10 +1453,8 @@ int ast_bridge_call(struct ast_channel *chan,struct ast_channel *peer,struct ast
 			}
 			if (res >= FEATURE_RETURN_PASSDIGITS) {
 				res = 0;
-			} else {
-				ast_frfree(f);
+			} else 
 				break;
-			}
 			hasfeatures = !ast_strlen_zero(chan_featurecode) || !ast_strlen_zero(peer_featurecode);
 			if (hadfeatures && !hasfeatures) {
 				/* Restore backup */
@@ -1461,6 +1474,7 @@ int ast_bridge_call(struct ast_channel *chan,struct ast_channel *peer,struct ast
 					config->start_sound = NULL;
 					config->firstpass = 0;
 				}
+				config->start_time = ast_tvnow();
 				config->feature_timer = featuredigittimeout;
 				ast_log(LOG_DEBUG, "Set time limit to %ld\n", config->feature_timer);
 			}
@@ -1763,10 +1777,6 @@ static int park_exec(struct ast_channel *chan, void *data)
 		memset(&config, 0, sizeof(struct ast_bridge_config));
 		ast_set_flag(&(config.features_callee), AST_FEATURE_REDIRECT);
 		ast_set_flag(&(config.features_caller), AST_FEATURE_REDIRECT);
-		config.timelimit = 0;
-		config.play_warning = 0;
-		config.warning_freq = 0;
-		config.warning_sound=NULL;
 		res = ast_bridge_call(chan, peer, &config);
 
 		/* Simulate the PBX hanging up */
@@ -2045,11 +2055,12 @@ static int load_config(void)
 		ast_unregister_features();
 		var = ast_variable_browse(cfg, "applicationmap");
 		while(var) {
-			char *tmp_val=strdup(var->value);
+			char *tmp_val_orig=strdup(var->value);
+			char *tmp_val = tmp_val_orig;
 			char *exten, *party=NULL, *app=NULL, *app_args=NULL; 
 
 			if (!tmp_val) { 
-				ast_log(LOG_ERROR, "res_features: strdup failed");
+				ast_log(LOG_ERROR, "res_features: strdup failed\n");
 				continue;
 			}
 			
@@ -2062,7 +2073,7 @@ static int load_config(void)
 
 			if (!(app && strlen(app)) || !(exten && strlen(exten)) || !(party && strlen(party)) || !(var->name && strlen(var->name))) {
 				ast_log(LOG_NOTICE, "Please check the feature Mapping Syntax, either extension, name, or app aren't provided %s %s %s %s\n",app,exten,party,var->name);
-				free(tmp_val);
+				free(tmp_val_orig);
 				var = var->next;
 				continue;
 			}
@@ -2077,7 +2088,7 @@ static int load_config(void)
 				}
 				if (!feature) {
 					ast_log(LOG_NOTICE, "Malloc failed at feature mapping\n");
-					free(tmp_val);
+					free(tmp_val_orig);
 					var = var->next;
 					continue;
 				}
@@ -2086,7 +2097,6 @@ static int load_config(void)
 				ast_copy_string(feature->sname,var->name,FEATURE_SNAME_LEN);
 				ast_copy_string(feature->app,app,FEATURE_APP_LEN);
 				ast_copy_string(feature->exten, exten,FEATURE_EXTEN_LEN);
-				free(tmp_val);
 				
 				if (app_args) 
 					ast_copy_string(feature->app_args,app_args,FEATURE_APP_ARGS_LEN);
@@ -2101,6 +2111,7 @@ static int load_config(void)
 					ast_set_flag(feature,AST_FEATURE_FLAG_CALLEE);
 				else {
 					ast_log(LOG_NOTICE, "Invalid party specification for feature '%s', must be caller, or callee\n", var->name);
+					free(tmp_val_orig);
 					var = var->next;
 					continue;
 				}
@@ -2108,6 +2119,7 @@ static int load_config(void)
 				ast_register_feature(feature);
 				
 				if (option_verbose >=1) ast_verbose(VERBOSE_PREFIX_2 "Mapping Feature '%s' to app '%s' with code '%s'\n", var->name, app, exten);  
+				free(tmp_val_orig);
 			}
 			var = var->next;
 		}	 
@@ -2137,7 +2149,6 @@ int load_module(void)
 {
 	int res;
 	
-	AST_LIST_HEAD_INIT(&feature_list);
 	memset(parking_ext, 0, sizeof(parking_ext));
 	memset(parking_con, 0, sizeof(parking_con));
 

@@ -39,7 +39,7 @@
 
 #include "asterisk.h"
 
-ASTERISK_FILE_VERSION(__FILE__, "$Revision: 17945 $")
+ASTERISK_FILE_VERSION(__FILE__, "$Revision: 43924 $")
 
 #include "asterisk/lock.h"
 #include "asterisk/file.h"
@@ -145,7 +145,7 @@ static void database_increment( char *key )
 	res = ast_db_put(db_family, key, value);
 	
 	if((res)&&(option_verbose >= 4))
-		ast_verbose(VERBOSE_PREFIX_4 "AlarmReceiver: database_increment write error");
+		ast_verbose(VERBOSE_PREFIX_4 "AlarmReceiver: database_increment write error\n");
 	
 	return;	
 }
@@ -215,6 +215,7 @@ static int send_tone_burst(struct ast_channel *chan, float freq, int duration, i
 
 			i += wf.datalen / 8;
 			if (i > duration) {
+				ast_frfree(f);
 				break;
 			}
 			if (ast_write(chan, &wf)){
@@ -222,6 +223,7 @@ static int send_tone_burst(struct ast_channel *chan, float freq, int duration, i
 					ast_verbose(VERBOSE_PREFIX_4 "AlarmReceiver: Failed to write frame on %s\n", chan->name);
 				ast_log(LOG_WARNING, "AlarmReceiver Failed to write frame on %s\n",chan->name);
 				res = -1;
+				ast_frfree(f);
 				break;
 			}
 		}
