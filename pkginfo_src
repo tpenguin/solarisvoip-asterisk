@@ -1,6 +1,6 @@
 PKG=SVasterisk
 NAME=Asterisk PBX
-VERSION=1.2.7.1
+VERSION=1.2.27
 ARCH=<arch>
 CATEGORY=system
 VENDOR=SolarisVoip.com
