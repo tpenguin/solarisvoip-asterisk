@@ -19,7 +19,8 @@
  *
  * This version may be optionally licenced under the GNU LGPL licence.
  *
- * This version is disclaimed to DIGIUM for inclusion in the Asterisk project.
+ * A license has been granted to Digium (via disclaimer) for the use of
+ * this code.
  */
 
 /*! \file
@@ -36,7 +37,7 @@
 
 #include "asterisk.h"
 
-ASTERISK_FILE_VERSION(__FILE__, "$Revision: 7221 $")
+ASTERISK_FILE_VERSION(__FILE__, "$Revision: 34087 $")
 
 #include "asterisk/plc.h"
 

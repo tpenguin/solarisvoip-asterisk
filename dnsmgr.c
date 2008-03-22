@@ -36,7 +36,7 @@
 
 #include "asterisk.h"
 
-ASTERISK_FILE_VERSION(__FILE__, "$Revision: 10863 $")
+ASTERISK_FILE_VERSION(__FILE__, "$Revision: 68368 $")
 
 #include "asterisk/dnsmgr.h"
 #include "asterisk/linkedlists.h"
@@ -57,7 +57,7 @@ struct ast_dnsmgr_entry {
 	char name[1];
 };
 
-static AST_LIST_HEAD(entry_list, ast_dnsmgr_entry) entry_list;
+static AST_LIST_HEAD_STATIC(entry_list, ast_dnsmgr_entry);
 
 AST_MUTEX_DEFINE_STATIC(refresh_lock);
 
@@ -112,6 +112,9 @@ void ast_dnsmgr_release(struct ast_dnsmgr_entry *entry)
 
 int ast_dnsmgr_lookup(const char *name, struct in_addr *result, struct ast_dnsmgr_entry **dnsmgr)
 {
+	struct ast_hostent ahp;
+	struct hostent *hp;
+
 	if (ast_strlen_zero(name) || !result || !dnsmgr)
 		return -1;
 
@@ -126,28 +129,25 @@ int ast_dnsmgr_lookup(const char *name, struct in_addr *result, struct ast_dnsmg
 	if (inet_aton(name, result))
 		return 0;
 
-	/* if the manager is disabled, do a direct lookup and return the result,
-	   otherwise register a managed lookup for the name */
-	if (!enabled) {
-		struct ast_hostent ahp;
-		struct hostent *hp;
+	/* do a lookup now but add a manager so it will automagically get updated in the background */
+	if ((hp = ast_gethostbyname(name, &ahp)))
+		memcpy(result, hp->h_addr, sizeof(result));
 
-		if ((hp = ast_gethostbyname(name, &ahp)))
-			memcpy(result, hp->h_addr, sizeof(result));
+	/* if dnsmgr is not enable don't bother adding an entry */
+	if (!enabled)
 		return 0;
-	} else {
-		if (option_verbose > 2)
-			ast_verbose(VERBOSE_PREFIX_2 "adding manager for '%s'\n", name);
-		*dnsmgr = ast_dnsmgr_get(name, result);
-		return !*dnsmgr;
-	}
+	
+	if (option_verbose > 2)
+		ast_verbose(VERBOSE_PREFIX_2 "adding manager for '%s'\n", name);
+	*dnsmgr = ast_dnsmgr_get(name, result);
+	return !*dnsmgr;
 }
 
 static void *do_refresh(void *data)
 {
 	for (;;) {
 		pthread_testcancel();
-		usleep(ast_sched_wait(sched));
+		usleep((ast_sched_wait(sched)*1000));
 		pthread_testcancel();
 		ast_sched_runq(sched);
 	}
@@ -289,7 +289,6 @@ int dnsmgr_init(void)
 		ast_log(LOG_ERROR, "Unable to create schedule context.\n");
 		return -1;
 	}
-	AST_LIST_HEAD_INIT(&entry_list);
 	ast_cli_register(&cli_reload);
 	ast_cli_register(&cli_status);
 	return do_reload(1);
@@ -340,16 +339,16 @@ static int do_reload(int loading)
 
 	/* if this reload enabled the manager, create the background thread
 	   if it does not exist */
-	if (enabled && !was_enabled && (refresh_thread == AST_PTHREADT_NULL)) {
-		if (ast_pthread_create(&refresh_thread, NULL, do_refresh, NULL) < 0) {
-			ast_log(LOG_ERROR, "Unable to start refresh thread.\n");
-		}
-		else {
+	if (enabled) {
+		if (!was_enabled && (refresh_thread == AST_PTHREADT_NULL)) {
+			if (ast_pthread_create(&refresh_thread, NULL, do_refresh, NULL) < 0) {
+				ast_log(LOG_ERROR, "Unable to start refresh thread.\n");
+			}
 			ast_cli_register(&cli_refresh);
-			/* make a background refresh happen right away */
-			refresh_sched = ast_sched_add_variable(sched, 100, refresh_list, &master_refresh_info, 1);
-			res = 0;
 		}
+		/* make a background refresh happen right away */
+		refresh_sched = ast_sched_add_variable(sched, 100, refresh_list, &master_refresh_info, 1);
+		res = 0;
 	}
 	/* if this reload disabled the manager and there is a background thread,
 	   kill it */

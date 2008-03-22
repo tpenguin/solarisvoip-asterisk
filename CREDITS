@@ -33,6 +33,14 @@ Jim Dixon - Zapata Telephony and app_rpt
 Russell Bryant - Asterisk 1.0 maintainer and misc. enhancements
 	russelb@clemson.edu
 Anthony Minessale II - Countless big and small fixes, and relentless forward push
+	ChanSpy, ForkCDR, ControlPlayback, While/EndWhile, DumpChan, Dictate,
+	MacroIf, ExecIf, ExecIfTime, RetryDial, MixMonitor applications; res_odbc;
+	many realtime concepts and implementation pieces, including res_config_odbc;
+	format_slin; cdr_custom; several features in Dial including L(), G() and
+	enhancements to M() and D(); several CDR enhancements including CDR variables;
+	attended transfer; one touch record; native MOH; manager eventmask; command
+	line '-t' flag to allow recording/voicemail on nfs shares; #exec command and
+	multiline comments in config files; setvar in iax and sip configs.
 	anthmct@yahoo.com              http://www.asterlink.com
 James Golovich - Innumerable contributions
 	You can find him and asterisk-perl at http://asterisk.gnuinter.net

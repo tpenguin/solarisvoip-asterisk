@@ -33,7 +33,7 @@
 
 #include "asterisk.h"
 
-ASTERISK_FILE_VERSION(__FILE__, "$Revision: 7221 $")
+ASTERISK_FILE_VERSION(__FILE__, "$Revision: 47780 $")
 
 #include "asterisk/options.h"
 #include "asterisk/file.h"
@@ -63,7 +63,7 @@ static char *p_descrip =
 "  This application has been deprecated in favor of the DB function.\n";
 
 static char *d_descrip =
-"  DBdel(family/key): This applicaiton will delete a key from the Asterisk\n"
+"  DBdel(family/key): This application will delete a key from the Asterisk\n"
 "database.\n";
 
 static char *dt_descrip =

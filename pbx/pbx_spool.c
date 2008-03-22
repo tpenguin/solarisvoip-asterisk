@@ -36,7 +36,7 @@
 
 #include "asterisk.h"
 
-ASTERISK_FILE_VERSION(__FILE__, "$Revision: 9581 $")
+ASTERISK_FILE_VERSION(__FILE__, "$Revision: 72805 $")
 
 #include "asterisk/lock.h"
 #include "asterisk/file.h"
@@ -240,7 +240,7 @@ static void safe_append(struct outgoing *o, time_t now, char *s)
 	if (fd > -1) {
 		f = fdopen(fd, "a");
 		if (f) {
-			fprintf(f, "%s: %ld %d (%ld)\n", s, (long)ast_mainpid, o->retries, (long) now);
+			fprintf(f, "\n%s: %ld %d (%ld)\n", s, (long)ast_mainpid, o->retries, (long) now);
 			fclose(f);
 		} else
 			close(fd);
@@ -295,6 +295,7 @@ static void launch_service(struct outgoing *o)
 		ast_log(LOG_WARNING, "Unable to create thread :( (returned error: %d)\n", ret);
 		free_outgoing(o);
 	}
+	pthread_attr_destroy(&attr);
 }
 
 static int scan_service(char *fn, time_t now, time_t atime)
@@ -315,8 +316,8 @@ static int scan_service(char *fn, time_t now, time_t atime)
 					now += o->retrytime;
 					if (o->callingpid && (o->callingpid == ast_mainpid)) {
 						safe_append(o, time(NULL), "DelayedRetry");
-						free_outgoing(o);
 						ast_log(LOG_DEBUG, "Delaying retry since we're currently running '%s'\n", o->fn);
+						free_outgoing(o);
 					} else {
 						/* Increment retries */
 						o->retries++;
@@ -426,6 +427,7 @@ int load_module(void)
 		ast_log(LOG_WARNING, "Unable to create thread :( (returned error: %d)\n", ret);
 		return -1;
 	}
+	pthread_attr_destroy(&attr);
 	return 0;
 }
 

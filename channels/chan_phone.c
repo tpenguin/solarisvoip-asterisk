@@ -34,17 +34,17 @@
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
+#ifdef HAVE_LINUX_COMPILER_H
+#include <linux/compiler.h>
+#endif
 #include <linux/telephony.h>
 /* Still use some IXJ specific stuff */
 #include <linux/version.h>
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
-# include <linux/compiler.h>
-#endif
 #include <linux/ixjuser.h>
 
 #include "asterisk.h"
 
-ASTERISK_FILE_VERSION(__FILE__, "$Revision: 7221 $")
+ASTERISK_FILE_VERSION(__FILE__, "$Revision: 74587 $")
 
 #include "asterisk/lock.h"
 #include "asterisk/channel.h"
@@ -825,10 +825,12 @@ static struct ast_channel *phone_new(struct phone_pvt *i, int state, char *conte
 			strncpy(tmp->exten, "s",  sizeof(tmp->exten) - 1);
 		if (!ast_strlen_zero(i->language))
 			strncpy(tmp->language, i->language, sizeof(tmp->language)-1);
+
 		if (!ast_strlen_zero(i->cid_num))
 			tmp->cid.cid_num = strdup(i->cid_num);
 		if (!ast_strlen_zero(i->cid_name))
 			tmp->cid.cid_name = strdup(i->cid_name);
+
 		i->owner = tmp;
 		ast_mutex_lock(&usecnt_lock);
 		usecnt++;
@@ -1093,10 +1095,8 @@ static int restart_monitor()
 		  ast_log(LOG_WARNING, "Unable to lock the interface list\n");
 		  return -1;
 		}
+		/* Wake up the thread */
 		pthread_cancel(monitor_thread);
-#if 0
-		pthread_join(monitor_thread, NULL);
-#endif
 		ast_mutex_unlock(&iflock);
 	}
 	/* Start a new monitor */

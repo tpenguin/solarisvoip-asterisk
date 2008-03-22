@@ -16,7 +16,7 @@
 ; Trunk groups are used for NFAS or GR-303 connections.
 ;
 ; Group: Defines a trunk group.  
-;        group => <trunkgroup>,<dchannel>[,<backup1>...]
+;        trunkgroup => <trunkgroup>,<dchannel>[,<backup1>...]
 ;
 ;        trunkgroup  is the numerical trunk group to create
 ;        dchannel    is the zap channel which will have the 
@@ -73,6 +73,7 @@ switchtype=national
 ; local:          Local ISDN
 ; national:	  National ISDN
 ; international:  International ISDN
+; dynamic:	  Dynamically selects the appropriate dialplan
 ;
 ;pridialplan=national
 ;
@@ -83,6 +84,7 @@ switchtype=national
 ; local:          Local ISDN
 ; national:	  National ISDN
 ; international:  International ISDN
+; dynamic:	  Dynamically selects the appropriate dialplan
 ;
 ;prilocaldialplan=national
 ;
@@ -206,7 +208,7 @@ signalling=fxo_ls
 rxwink=300		; Atlas seems to use long (250ms) winks
 ;
 ; How long generated tones (DTMF and MF) will be played on the channel
-; (in miliseconds)
+; (in milliseconds)
 ;toneduration=100
 ;
 ; Whether or not to do distinctive ring detection on FXO lines
@@ -235,7 +237,10 @@ usecallerid=yes
 ;
 hidecallerid=no
 ;
-; Whether or not to enable call waiting on FXO lines
+; Whether or not to enable call waiting on internal extensions
+; With this set to 'yes', busy extensions will hear the call-waiting
+; tone, and can use hook-flash to switch between callers. The Dial()
+; app will not return the "BUSY" result for extensions.
 ;
 callwaiting=yes
 ;
@@ -289,7 +294,7 @@ callreturn=yes
 ; stutter dialtone instead of a normal one. 
 ;
 ; If a mailbox is specified *with* a voicemail context, the same will result
-; if voicemail recieved in mailbox in the specified voicemail context.
+; if voicemail received in mailbox in the specified voicemail context.
 ;
 ; for default voicemail context, the example below is fine:
 ;
@@ -303,10 +308,17 @@ callreturn=yes
 ; Use either "yes", "no", or a power of two from 32 to 256 if you wish to
 ; actually set the number of taps of cancellation.
 ;
+; Note that if any of your Zaptel cards have hardware echo cancellers,
+; then this setting only turns them on and off; numeric settings will
+; be treated as "yes". There are no special settings required for
+; hardware echo cancellers; when present and enabled in their kernel
+; modules, they take precedence over the software echo canceller compiled
+; into Zaptel automatically.
+;
 echocancel=yes
 ;
 ; Generally, it is not necessary (and in fact undesirable) to echo cancel when
-; the circuit path is entirely TDM.  You may, however, reverse this behavior
+; the circuit path is entirely TDM.  You may, however, change this behavior
 ; by enabling the echo cancel during pure TDM bridging below.
 ;
 echocancelwhenbridged=yes
@@ -317,6 +329,8 @@ echocancelwhenbridged=yes
 ; response to pre-train the echo canceller so it can start out with a much
 ; closer idea of the actual echo.  Value may be "yes", "no", or a number of
 ; milliseconds to delay before training (default = 400)
+;
+; Note that these parameters do not apply to hardware echo cancellers.
 ;
 ;echotraining=yes
 ;echotraining=800
@@ -339,8 +353,8 @@ group=1
 ;
 ; Ring groups (a.k.a. call groups) and pickup groups.  If a phone is ringing
 ; and it is a member of a group which is one of your pickup groups, then
-; you can answer it by picking up and dialing *8#.  For simple offices, just
-; make these both the same
+; you can answer it by picking up and dialling *8#.  For simple offices, just
+; make these both the same.  Groups range from 0 to 63.
 ;
 callgroup=1
 pickupgroup=1
@@ -555,7 +569,7 @@ immediate=no
 
 ;
 
-;  Used for distintive ring support for x100p.
+;  Used for distinctive ring support for x100p.
 ;  You can see the dringX patterns is to set any one of the dringXcontext fields
 ;  and they will be printed on the console when an inbound call comes in.
 ;

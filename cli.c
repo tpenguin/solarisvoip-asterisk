@@ -32,7 +32,7 @@
 
 #include "asterisk.h"
 
-ASTERISK_FILE_VERSION(__FILE__, "$Revision: 11281 $")
+ASTERISK_FILE_VERSION(__FILE__, "$Revision: 43977 $")
 
 #include "asterisk/logger.h"
 #include "asterisk/options.h"
@@ -772,8 +772,8 @@ static int handle_showchan(int fd, int argc, char *argv[])
 		"        Context: %s\n"
 		"      Extension: %s\n"
 		"       Priority: %d\n"
-		"     Call Group: %d\n"
-		"   Pickup Group: %d\n"
+		"     Call Group: %llu\n"
+		"   Pickup Group: %llu\n"
 		"    Application: %s\n"
 		"           Data: %s\n"
 		"    Blocking in: %s\n",

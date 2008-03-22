@@ -3,7 +3,8 @@
  *
  * Copyright (C) 2005 Anthony Minessale II (anthmct@yahoo.com)
  *
- * Disclaimed to Digium
+ * A license has been granted to Digium (via disclaimer) for the use of
+ * this code.
  *
  * See http://www.asterisk.org for more information about
  * the Asterisk project. Please do not directly contact
@@ -30,7 +31,7 @@
 
 #include "asterisk.h"
 
-ASTERISK_FILE_VERSION(__FILE__, "$Revision: 7740 $")
+ASTERISK_FILE_VERSION(__FILE__, "$Revision: 75066 $")
 
 #include "asterisk/file.h"
 #include "asterisk/logger.h"
@@ -52,7 +53,7 @@ AST_MUTEX_DEFINE_STATIC(modlock);
 #define ALL_DONE(u, ret) LOCAL_USER_REMOVE(u); return ret;
 #define get_volfactor(x) x ? ((x > 0) ? (1 << x) : ((1 << abs(x)) * -1)) : 0
 
-static const char *synopsis = "Listen to the audio of an active channel\n";
+static const char *synopsis = "Listen to the audio of an active channel";
 static const char *app = "ChanSpy";
 static const char *desc = 
 "  ChanSpy([chanprefix][|options]): This application is used to listen to the\n"
@@ -130,7 +131,7 @@ static struct ast_channel *local_get_channel_begin_name(char *name)
 	ast_mutex_lock(&modlock);
 	chan = local_channel_walk(NULL);
 	while (chan) {
-		if (!strncmp(chan->name, name, strlen(name))) {
+		if (!strncmp(chan->name, name, strlen(name)) && strncmp(chan->name, "Zap/pseudo", 10)) {
 			ret = chan;
 			break;
 		}
@@ -206,21 +207,6 @@ static int start_spying(struct ast_channel *chan, struct ast_channel *spychan, s
 	return res;
 }
 
-static void stop_spying(struct ast_channel *chan, struct ast_channel_spy *spy) 
-{
-	/* If our status has changed to DONE, then the channel we're spying on is gone....
-	   DON'T TOUCH IT!!!  RUN AWAY!!! */
-	if (spy->status == CHANSPY_DONE)
-		return;
-
-	if (!chan)
-		return;
-
-	ast_mutex_lock(&chan->lock);
-	ast_channel_spy_remove(chan, spy);
-	ast_mutex_unlock(&chan->lock);
-};
-
 /* Map 'volume' levels from -4 through +4 into
    decibel (dB) settings for channel drivers
 */
@@ -251,102 +237,112 @@ static void set_volume(struct ast_channel *chan, struct chanspy_translation_help
 static int channel_spy(struct ast_channel *chan, struct ast_channel *spyee, int *volfactor, int fd) 
 {
 	struct chanspy_translation_helper csth;
-	int running, res = 0, x = 0;
-	char inp[24];
-	char *name=NULL;
-	struct ast_frame *f;
+	int running = 0, res = 0, x = 0;
+	char inp[24] = "", *name = NULL;
+	struct ast_frame *f = NULL;
 
-	running = (chan && !ast_check_hangup(chan) && spyee && !ast_check_hangup(spyee));
+	if ((chan && ast_check_hangup(chan)) || (spyee && ast_check_hangup(spyee)))
+		return 0;
 
-	if (running) {
-		memset(inp, 0, sizeof(inp));
-		name = ast_strdupa(spyee->name);
-		if (option_verbose >= 2)
-			ast_verbose(VERBOSE_PREFIX_2 "Spying on channel %s\n", name);
+	name = ast_strdupa(spyee->name);
+	if (option_verbose > 1)
+		ast_verbose(VERBOSE_PREFIX_2 "Spying on channel %s\n", name);
 
-		memset(&csth, 0, sizeof(csth));
-		ast_set_flag(&csth.spy, CHANSPY_FORMAT_AUDIO);
-		ast_set_flag(&csth.spy, CHANSPY_TRIGGER_NONE);
-		ast_set_flag(&csth.spy, CHANSPY_MIXAUDIO);
-		csth.spy.type = chanspy_spy_type;
-		csth.spy.status = CHANSPY_RUNNING;
-		csth.spy.read_queue.format = AST_FORMAT_SLINEAR;
-		csth.spy.write_queue.format = AST_FORMAT_SLINEAR;
-		ast_mutex_init(&csth.spy.lock);
-		csth.volfactor = *volfactor;
-		set_volume(chan, &csth);
+	memset(&csth, 0, sizeof(csth));
+	ast_set_flag(&csth.spy, CHANSPY_FORMAT_AUDIO);
+	ast_set_flag(&csth.spy, CHANSPY_TRIGGER_NONE);
+	ast_set_flag(&csth.spy, CHANSPY_MIXAUDIO);
+	csth.spy.type = chanspy_spy_type;
+	csth.spy.status = CHANSPY_RUNNING;
+	csth.spy.read_queue.format = AST_FORMAT_SLINEAR;
+	csth.spy.write_queue.format = AST_FORMAT_SLINEAR;
+	ast_mutex_init(&csth.spy.lock);
+	csth.volfactor = *volfactor;
+	set_volume(chan, &csth);
+	if (csth.volfactor) {
+		ast_set_flag(&csth.spy, CHANSPY_READ_VOLADJUST);
 		csth.spy.read_vol_adjustment = csth.volfactor;
+		ast_set_flag(&csth.spy, CHANSPY_WRITE_VOLADJUST);
 		csth.spy.write_vol_adjustment = csth.volfactor;
-		csth.fd = fd;
+	}
+	csth.fd = fd;
 
-		if (start_spying(spyee, chan, &csth.spy))
-			running = 0;
+	if (start_spying(spyee, chan, &csth.spy)) {
+		ast_channel_spy_free(&csth.spy);
+		return 0;
 	}
 
-	if (running) {
-		running = 1;
-		ast_activate_generator(chan, &spygen, &csth);
+	ast_activate_generator(chan, &spygen, &csth);
 
-		while (csth.spy.status == CHANSPY_RUNNING &&
-		       chan && !ast_check_hangup(chan) &&
-		       spyee &&
-		       !ast_check_hangup(spyee) &&
-		       running == 1 &&
-		       (res = ast_waitfor(chan, -1) > -1)) {
-			if ((f = ast_read(chan))) {
-				res = 0;
-				if (f->frametype == AST_FRAME_DTMF) {
-					res = f->subclass;
-				}
-				ast_frfree(f);
-				if (!res) {
-					continue;
-				}
-			} else {
+	while (csth.spy.status == CHANSPY_RUNNING &&
+	       (res = ast_waitfor(chan, -1) > -1)) {
+		
+		/* Read in frame from channel, break out if no frame */
+		if (!(f = ast_read(chan)))
+			break;
+		
+		/* Now if this is DTMF then we have to handle it as such, otherwise just skip it */
+		res = 0;
+		if (f->frametype == AST_FRAME_DTMF)
+			res = f->subclass;
+		ast_frfree(f);
+		if (!res)
+			continue;
+		
+		if (x == sizeof(inp))
+			x = 0;
+		
+		if (res < 0) {
+			running = -1;
+			break;
+		}
+		
+		/* Process DTMF digits */
+		if (res == '#') {
+			if (!ast_strlen_zero(inp)) {
+				running = x ? atoi(inp) : -1;
 				break;
-			}
-			if (x == sizeof(inp)) {
-				x = 0;
-			}
-			if (res < 0) {
-				running = -1;
-			}
-			if (res == 0) {
-				continue;
-			} else if (res == '*') {
-				running = 0; 
-			} else if (res == '#') {
-				if (!ast_strlen_zero(inp)) {
-					running = x ? atoi(inp) : -1;
-					break;
-				} else {
-					(*volfactor)++;
-					if (*volfactor > 4) {
-						*volfactor = -4;
-					}
-					if (option_verbose > 2) {
-						ast_verbose(VERBOSE_PREFIX_3 "Setting spy volume on %s to %d\n", chan->name, *volfactor);
-					}
-					csth.volfactor = *volfactor;
-					set_volume(chan, &csth);
+			} else {
+				(*volfactor)++;
+				if (*volfactor > 4)
+					*volfactor = -1;
+				if (option_verbose > 2)
+					ast_verbose(VERBOSE_PREFIX_3 "Setting spy volume on %s to %d\n", chan->name, *volfactor);
+				csth.volfactor = *volfactor;
+				set_volume(chan, &csth);
+				if (csth.volfactor) {
+					ast_set_flag(&csth.spy, CHANSPY_READ_VOLADJUST);
 					csth.spy.read_vol_adjustment = csth.volfactor;
+					ast_set_flag(&csth.spy, CHANSPY_WRITE_VOLADJUST);
 					csth.spy.write_vol_adjustment = csth.volfactor;
+				} else {
+					ast_clear_flag(&csth.spy, CHANSPY_READ_VOLADJUST);
+					ast_clear_flag(&csth.spy, CHANSPY_WRITE_VOLADJUST);
 				}
-			} else if (res >= 48 && res <= 57) {
-				inp[x++] = res;
 			}
+		} else if (res == '*') {
+			break;
+		} else if (res >= 48 && res <= 57) {
+			inp[x++] = res;
 		}
-		ast_deactivate_generator(chan);
-		stop_spying(spyee, &csth.spy);
-
-		if (option_verbose >= 2) {
-			ast_verbose(VERBOSE_PREFIX_2 "Done Spying on channel %s\n", name);
-		}
-	} else {
-		running = 0;
 	}
 
-	ast_mutex_destroy(&csth.spy.lock);
+	ast_deactivate_generator(chan);
+	
+	csth.spy.status = CHANSPY_DONE;
+
+	ast_mutex_lock(&csth.spy.lock);
+	if (csth.spy.chan) {
+		ast_mutex_lock(&csth.spy.chan->lock);
+		ast_channel_spy_remove(csth.spy.chan, &csth.spy);
+		ast_mutex_unlock(&csth.spy.chan->lock);
+	}
+	ast_mutex_unlock(&csth.spy.lock);
+
+	if (option_verbose > 1)
+		ast_verbose(VERBOSE_PREFIX_2 "Done Spying on channel %s\n", name);
+
+	ast_channel_spy_free(&csth.spy);
 
 	return running;
 }
@@ -418,24 +414,26 @@ static int chanspy_exec(struct ast_channel *chan, void *data)
 		char *opts[OPT_ARG_ARRAY_SIZE];
 		ast_app_parse_options(chanspy_opts, &flags, opts, options);
 		if (ast_test_flag(&flags, OPTION_GROUP)) {
-			mygroup = opts[1];
+			mygroup = opts[OPT_ARG_GROUP];
 		}
 		if (ast_test_flag(&flags, OPTION_RECORD)) {
-			if (!(recbase = opts[2])) {
+			if (!(recbase = opts[OPT_ARG_RECORD])) {
 				recbase = "chanspy";
 			}
 		}
 		silent = ast_test_flag(&flags, OPTION_QUIET);
 		bronly = ast_test_flag(&flags, OPTION_BRIDGED);
-		if (ast_test_flag(&flags, OPTION_VOLUME) && opts[1]) {
+		if (ast_test_flag(&flags, OPTION_VOLUME) && opts[OPT_ARG_VOLUME]) {
 			int vol;
 
-			if ((sscanf(opts[0], "%d", &vol) != 1) || (vol > 4) || (vol < -4))
+			if ((sscanf(opts[OPT_ARG_VOLUME], "%d", &vol) != 1) || (vol > 4) || (vol < -4))
 				ast_log(LOG_NOTICE, "Volume factor must be a number between -4 and 4\n");
 			else
 				volfactor = vol;
 			}
 	}
+	else 
+		ast_clear_flag(&flags, AST_FLAGS_ALL);
 
 	if (recbase) {
 		char filename[512];

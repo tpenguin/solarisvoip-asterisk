@@ -32,6 +32,7 @@ context=default			; Default context for incoming calls
 				; Realms MUST be globally unique according to RFC 3261
 				; Set this to your host name or domain name
 bindport=5060			; UDP Port to bind to (SIP standard port is 5060)
+				; bindport is the local UDP port that Asterisk will listen on
 bindaddr=0.0.0.0		; IP address to bind to (0.0.0.0 binds to all)
 srvlookup=yes			; Enable DNS SRV lookups on outbound calls
 				; Note: Asterisk only uses the first host 
@@ -59,7 +60,7 @@ srvlookup=yes			; Enable DNS SRV lookups on outbound calls
 ;tos=184			; Set IP QoS to either a keyword or numeric val
 ;tos=lowdelay			; lowdelay,throughput,reliability,mincost,none
 ;maxexpiry=3600			; Max length of incoming registration we allow
-;defaultexpiry=120		; Default length of incoming/outoing registration
+;defaultexpiry=120		; Default length of incoming/outgoing registration
 ;notifymimetype=text/plain	; Allow overriding of mime type in MWI NOTIFY
 ;checkmwi=10			; Default time between mailbox checks for peers
 ;vmexten=voicemail      ; dialplan extension to reach mailbox sets the 
@@ -107,7 +108,10 @@ srvlookup=yes			; Enable DNS SRV lookups on outbound calls
 				; Useful to limit subscriptions to local extensions
 				; Settable per peer/user also
 ;notifyringing = yes		; Notify subscriptions on RINGING state
-
+;alwaysauthreject = yes		; When an incoming INVITE or REGISTER is to be rejected,
+		    		; for any reason, always reject with '401 Unauthorized'
+				; instead of letting the requester know whether there was
+				; a matching user or peer for their request
 ;
 ; If regcontext is specified, Asterisk will dynamically create and destroy a
 ; NoOp priority 1 extension for a given peer who registers or unregisters with
@@ -184,7 +188,7 @@ srvlookup=yes			; Enable DNS SRV lookups on outbound calls
 ;
 ;nat=no				; Global NAT settings  (Affects all peers and users)
                                 ; yes = Always ignore info and assume NAT
-                                ; no = Use NAT mode only according to RFC3581 
+                                ; no = Use NAT mode only according to RFC3581 (;rport)
                                 ; never = Never attempt NAT mode or RFC3581 support
 				; route = Assume NAT, don't send rport 
 				; (work around more UNIDEN bugs)
@@ -304,6 +308,7 @@ srvlookup=yes			; Enable DNS SRV lookups on outbound calls
 ;                             rtptimeout
 ;                             rtpholdtimeout
 ;                             sendrpid
+;                             outboundproxy
 
 ;[sip_proxy]
 ; For incoming calls only. Example: FWD (Free World Dialup)
@@ -314,14 +319,16 @@ srvlookup=yes			; Enable DNS SRV lookups on outbound calls
 ;host=fwd.pulver.com
 
 ;[sip_proxy-out]
-;type=peer          		; we only want to call out, not be called
+;type=peer          			; we only want to call out, not be called
 ;secret=guessit
-;username=yourusername		; Authentication user for outbound proxies
-;fromuser=yourusername		; Many SIP providers require this!
+;username=yourusername			; Authentication user for outbound proxies
+;fromuser=yourusername			; Many SIP providers require this!
 ;fromdomain=provider.sip.domain	
 ;host=box.provider.com
-;usereqphone=yes		; This provider requires ";user=phone" on URI
-;call-limit=5			; permit only 5 simultaneous outgoing calls to this peer
+;usereqphone=yes			; This provider requires ";user=phone" on URI
+;call-limit=5				; permit only 5 simultaneous outgoing calls to this peer
+;outboundproxy=proxy.provider.domain	; send outbound signaling to this proxy, not directly to the peer
+;port=80				; The port number we want to connect to on the remote side
 
 ;------------------------------------------------------------------------------
 ; Definitions of locally connected SIP phones
@@ -332,7 +339,7 @@ srvlookup=yes			; Enable DNS SRV lookups on outbound calls
 ;
 ; For local phones, type=friend works most of the time
 ;
-; If you have one-way audio, you propably have NAT problems. 
+; If you have one-way audio, you probably have NAT problems. 
 ; If Asterisk is on a public IP, and the phone is inside of a NAT device
 ; you will need to configure nat option for those phones.
 ; Also, turn on qualify=yes to keep the nat session open
@@ -358,7 +365,6 @@ srvlookup=yes			; Enable DNS SRV lookups on outbound calls
 ;allow=alaw
 ;allow=g723.1			; Asterisk only supports g723.1 pass-thru!
 ;allow=g729			; Pass-thru only unless g729 license obtained
-;astdb=chan2ext/SIP/grandstream1=1234	; ensures an astDB entry exists
 
 
 ;[xlite1]
@@ -418,9 +424,12 @@ srvlookup=yes			; Enable DNS SRV lookups on outbound calls
 ;qualify=1000			; Consider it down if it's 1 second to reply
 				; Helps with NAT session
 				; qualify=yes uses default value
+;
+; Call group and Pickup group should be in the range from 0 to 63
+;
 ;callgroup=1,3-4		; We are in caller groups 1,3,4
 ;pickupgroup=1,3-5		; We can do call pick-p for call group 1,3,4,5
-;defaultip=192.168.0.60		; IP address to use if peer has not registred
+;defaultip=192.168.0.60		; IP address to use if peer has not registered
 
 ;[cisco1]
 ;type=friend

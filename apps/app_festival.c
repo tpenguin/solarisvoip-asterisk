@@ -42,7 +42,7 @@
 
 #include "asterisk.h"
 
-ASTERISK_FILE_VERSION(__FILE__, "$Revision: 8140 $")
+ASTERISK_FILE_VERSION(__FILE__, "$Revision: 48374 $")
 
 #include "asterisk/file.h"
 #include "asterisk/logger.h"
@@ -53,6 +53,7 @@ ASTERISK_FILE_VERSION(__FILE__, "$Revision: 8140 $")
 #include "asterisk/config.h"
 #include "asterisk/utils.h"
 #include "asterisk/lock.h"
+#include "asterisk/options.h"
 
 #define FESTIVAL_CONFIG "festival.conf"
 
@@ -126,16 +127,26 @@ static int send_waveform_to_fd(char *waveform, int length, int fd) {
 #ifdef __PPC__ 
 	char c;
 #endif
+	sigset_t fullset, oldset;
+
+	sigfillset(&fullset);
+	pthread_sigmask(SIG_BLOCK, &fullset, &oldset);
 
         res = fork();
         if (res < 0)
                 ast_log(LOG_WARNING, "Fork failed\n");
-        if (res)
+        if (res) {
+		pthread_sigmask(SIG_SETMASK, &oldset, NULL);
                 return res;
+	}
         for (x=0;x<256;x++) {
                 if (x != fd)
                         close(x);
         }
+	if (option_highpriority)
+		ast_set_priority(0);
+	signal(SIGPIPE, SIG_DFL);
+	pthread_sigmask(SIG_UNBLOCK, &fullset, NULL);
 /*IAS */
 #ifdef __PPC__  
 	for( x=0; x<length; x+=2)
@@ -230,11 +241,13 @@ static int send_waveform_to_channel(struct ast_channel *chan, char *waveform, in
 					myf.f.data = myf.frdata;
 					if (ast_write(chan, &myf.f) < 0) {
 						res = -1;
+						ast_frfree(f);
 						break;
 					}
 					if (res < needed) { /* last frame */
 						ast_log(LOG_DEBUG, "Last frame\n");
 						res=0;
+						ast_frfree(f);
 						break;
 					}
 				} else {
@@ -465,7 +478,10 @@ static int festival_exec(struct ast_channel *chan, void *vdata)
                         * */
                        if ( read_data == -1 )
                        {
-                               ast_log(LOG_WARNING,"Unable to read from cache/festival fd");
+                               ast_log(LOG_WARNING,"Unable to read from cache/festival fd\n");
+			       close(fd);
+			       ast_config_destroy(cfg);
+			       LOCAL_USER_REMOVE(u);
                                return -1;
                        }
                        n += read_data;

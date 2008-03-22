@@ -37,7 +37,7 @@ extern "C" {
 
 #include "asterisk.h"
 
-ASTERISK_FILE_VERSION(__FILE__, "$Revision: 7221 $")
+ASTERISK_FILE_VERSION(__FILE__, "$Revision: 38904 $")
 
 #include "asterisk/lock.h"
 #include "asterisk/utils.h"
@@ -2647,7 +2647,12 @@ static struct ast_channel *vpb_new(struct vpb_pvt *me, int state, char *context)
 			cid_name[0] = '\0';
 			cid_num[0] = '\0';
 			ast_callerid_split(me->callerid, cid_name, sizeof(cid_name), cid_num, sizeof(cid_num));
-			ast_set_callerid(tmp, cid_num, cid_name, cid_num);
+			if (!ast_strlen_zero(cid_num)) {
+				tmp->cid.cid_num = strdup(cid_num);
+				tmp->cid.cid_ani = strdup(cid_num);
+			}
+			if (!ast_strlen_zero(cid_name))
+				tmp->cid.cid_name = strdup(cid_name);
 		}
 		tmp->tech_pvt = me;
 		

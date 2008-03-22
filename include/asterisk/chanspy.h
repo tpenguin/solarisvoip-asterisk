@@ -58,6 +58,7 @@ struct ast_channel_spy {
 	AST_LIST_ENTRY(ast_channel_spy) list;
 	ast_mutex_t lock;
 	ast_cond_t trigger;
+	struct ast_channel *chan;
 	struct ast_channel_spy_queue read_queue;
 	struct ast_channel_spy_queue write_queue;
 	unsigned int flags;
@@ -92,6 +93,15 @@ int ast_channel_spy_add(struct ast_channel *chan, struct ast_channel_spy *spy);
   calling this function.
  */
 void ast_channel_spy_remove(struct ast_channel *chan, struct ast_channel_spy *spy);
+
+/*!
+  \brief Free a spy.
+  \param spy The spy to free
+  \return nothing
+
+  Note: This function MUST NOT be called with the spy locked.
+*/
+void ast_channel_spy_free(struct ast_channel_spy *spy);
 
 /*!
   \brief Find all spies of a particular type on a channel and stop them.

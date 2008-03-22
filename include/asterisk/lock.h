@@ -97,6 +97,13 @@ typedef struct ast_mutex_info ast_mutex_t;
 
 typedef pthread_cond_t ast_cond_t;
 
+static pthread_mutex_t empty_mutex;
+
+static void __attribute__((constructor)) init_empty_mutex(void)
+{
+	memset(&empty_mutex, 0, sizeof(empty_mutex));
+}
+
 static inline int __ast_pthread_mutex_init_attr(const char *filename, int lineno, const char *func,
 						const char *mutex_name, ast_mutex_t *t,
 						pthread_mutexattr_t *attr) 
@@ -105,14 +112,16 @@ static inline int __ast_pthread_mutex_init_attr(const char *filename, int lineno
 	int canlog = strcmp(filename, "logger.c");
 
 	if ((t->mutex) != ((pthread_mutex_t) PTHREAD_MUTEX_INITIALIZER)) {
-		__ast_mutex_logger("%s line %d (%s): Error: mutex '%s' is already initialized.\n",
-				   filename, lineno, func, mutex_name);
-		__ast_mutex_logger("%s line %d (%s): Error: previously initialization of mutex '%s'.\n",
-				   t->file, t->lineno, t->func, mutex_name);
+		if ((t->mutex) != (empty_mutex)) {
+			__ast_mutex_logger("%s line %d (%s): Error: mutex '%s' is already initialized.\n",
+					   filename, lineno, func, mutex_name);
+			__ast_mutex_logger("%s line %d (%s): Error: previously initialization of mutex '%s'.\n",
+					   t->file, t->lineno, t->func, mutex_name);
 #ifdef THREAD_CRASH
-		DO_THREAD_CRASH;
+			DO_THREAD_CRASH;
 #endif
-		return 0;
+			return 0;
+		}
 	}
 #endif
 
@@ -259,7 +268,7 @@ static inline int __ast_pthread_mutex_lock(const char *filename, int lineno, con
 		}
 	} else {
 		__ast_mutex_logger("%s line %d (%s): Error obtaining mutex: %s\n",
-				   filename, lineno, func, strerror(errno));
+				   filename, lineno, func, strerror(res));
 #ifdef THREAD_CRASH
 		DO_THREAD_CRASH;
 #endif
@@ -476,7 +485,7 @@ static inline int __ast_cond_timedwait(const char *filename, int lineno, const c
 		t->thread[t->reentrancy] = 0;
 	}
 
-	if ((res = pthread_cond_timedwait(cond, &t->mutex, abstime))) {
+	if ((res = pthread_cond_timedwait(cond, &t->mutex, abstime)) && (res != ETIMEDOUT)) {
 		__ast_mutex_logger("%s line %d (%s): Error waiting on condition mutex '%s'\n", 
 				   filename, lineno, func, strerror(res));
 #ifdef THREAD_CRASH
@@ -656,5 +665,32 @@ static inline int ast_cond_timedwait(ast_cond_t *cond, ast_mutex_t *t, const str
 #ifndef __linux__
 #define pthread_create __use_ast_pthread_create_instead__
 #endif
+
+int ast_atomic_fetchadd_int_slow(volatile int *p, int v);
+
+#include "asterisk/inline_api.h"
+
+#if defined (__i386__) && !defined(__APPLE__)
+AST_INLINE_API(int ast_atomic_fetchadd_int(volatile int *p, int v),
+{
+	__asm __volatile (
+	"       lock   xaddl   %0, %1 ;        "
+	: "+r" (v),                     /* 0 (result) */   
+	  "=m" (*p)                     /* 1 */
+	: "m" (*p));                    /* 2 */
+	return (v);
+})
+#else   /* low performance version in utils.c */
+AST_INLINE_API(int ast_atomic_fetchadd_int(volatile int *p, int v),
+{
+	return ast_atomic_fetchadd_int_slow(p, v);
+})
+#endif
+
+AST_INLINE_API(int ast_atomic_dec_and_test(volatile int *p),
+{
+	int a = ast_atomic_fetchadd_int(p, -1);
+	return a == 1; /* true if the value is 0 now (so it was 1 previously) */
+})
 
 #endif /* _ASTERISK_LOCK_H */
