@@ -70,7 +70,8 @@ endif
 
 # On Sun, we will test for CSW curl
 ifeq ($(findstring SunOS,${OSARCH}),SunOS)
-  CURLLIBS=$(shell /opt/csw/bin/curl-config --libs)
+  CURLCONFIG=$(wildcard /opt/csw/bin/curl-config /usr/bin/curl-config)
+  CURLLIBS=$(shell $(CURLCONFIG) --libs)
   ifneq (${CURLLIBS},)
     APPS+=app_curl.so app_lookupcnam.so
   endif
