@@ -1122,6 +1122,7 @@ static inline int ast_fdisset(struct pollfd *pfds, int fd, int max, int *start)
 }
 
 #ifdef SOLARIS
+# ifndef timersub
 static inline void timersub(struct timeval *tvend, struct timeval *tvstart, struct timeval *tvdiff)
 {
 	tvdiff->tv_sec = tvend->tv_sec - tvstart->tv_sec;
@@ -1132,6 +1133,7 @@ static inline void timersub(struct timeval *tvend, struct timeval *tvstart, stru
 	}
 
 }
+# endif
 #endif
 
 /*! \brief Waits for activity on a group of channels 
