@@ -2699,68 +2699,41 @@ static int leave_voicemail(struct ast_channel *chan, char *ext, struct leave_vm_
 			if (!res)
 				res = ast_waitstream(chan, "");
 		}
-		if (msgnum < vmu->maxmsg) {
-			/* assign a variable with the name of the voicemail file */	  
-			pbx_builtin_setvar_helper(chan, "VM_MESSAGEFILE", fn);
-				
-			/* Store information */
-			snprintf(txtfile, sizeof(txtfile), "%s.txt", fn);
-			snprintf(tmptxtfile, sizeof(tmptxtfile), "%s.txt.tmp", fn);
-			txt = fopen(tmptxtfile, "w+");
-			if (txt) {
-				get_date(date, sizeof(date));
-				fprintf(txt, 
-					";\n"
-					"; Message Information file\n"
-					";\n"
-					"[message]\n"
-					"origmailbox=%s\n"
-					"context=%s\n"
-					"macrocontext=%s\n"
-					"exten=%s\n"
-					"priority=%d\n"
-					"callerchan=%s\n"
-					"callerid=%s\n"
-					"origdate=%s\n"
-					"origtime=%ld\n"
-					"category=%s\n",
-					ext,
-					chan->context,
-					chan->macrocontext, 
-					chan->exten,
-					chan->priority,
-					chan->name,
-					ast_callerid_merge(callerid, sizeof(callerid), chan->cid.cid_name, chan->cid.cid_num, "Unknown"),
-					date, (long)time(NULL),
-					category ? category : ""); 
-			} else
-				ast_log(LOG_WARNING, "Error opening text file for output\n");
-			res = play_record_review(chan, NULL, fn, vmmaxmessage, fmt, 1, vmu, &duration, dir, options->record_gain);
-			if (res == '0') {
-				if (txt) {
-					fclose(txt);
-					rename(tmptxtfile, txtfile);
-                    if(chmod(txtfile, VOICEMAIL_FILE_MODE) == -1) {
-                        ast_log(LOG_WARNING, "chmod '%s' failed: %s\n", txtfile, strerror(errno));
-                    }
-                    chmod_voicefiles(fn, fmt);
-				}
-				goto transfer;
-			}
-			if (res > 0)
-				res = 0;
-			if (txt) {
-				fprintf(txt, "duration=%d\n", duration);
-				fclose(txt);
-				rename(tmptxtfile, txtfile);
-                if(chmod(txtfile, VOICEMAIL_FILE_MODE) == -1) {
-                    ast_log(LOG_WARNING, "chmod '%s' failed: %s\n", txtfile, strerror(errno));
-                }
-                chmod_voicefiles(fn, fmt);
-			}
-				
+
+		txt = fdopen(txtdes, "w+");
+		if (txt) {
+			get_date(date, sizeof(date));
+			fprintf(txt, 
+				";\n"
+				"; Message Information file\n"
+				";\n"
+				"[message]\n"
+				"origmailbox=%s\n"
+				"context=%s\n"
+				"macrocontext=%s\n"
+				"exten=%s\n"
+				"priority=%d\n"
+				"callerchan=%s\n"
+				"callerid=%s\n"
+				"origdate=%s\n"
+				"origtime=%ld\n"
+				"category=%s\n",
+				ext,
+				chan->context,
+				chan->macrocontext, 
+				chan->exten,
+				chan->priority,
+				chan->name,
+				ast_callerid_merge(callerid, sizeof(callerid), chan->cid.cid_name, chan->cid.cid_num, "Unknown"),
+				date, (long)time(NULL),
+				category ? category : ""); 
+		} else
+			ast_log(LOG_WARNING, "Error opening text file for output\n");
+		res = play_record_review(chan, NULL, tmptxtfile, vmmaxmessage, fmt, 1, vmu, &duration, NULL, options->record_gain);
+
+		if (txt) {
 			if (duration < vmminmessage) {
-				if (option_verbose > 2) 
+				if (option_verbose > 2)
 					ast_verbose( VERBOSE_PREFIX_3 "Recording was %d seconds long but needs to be at least %d - abandoning\n", duration, vmminmessage);
 				fclose(txt);
 				ast_filedelete(tmptxtfile, NULL);
@@ -2770,11 +2743,10 @@ static int leave_voicemail(struct ast_channel *chan, char *ext, struct leave_vm_
 				fclose(txt);
 				if (vm_lock_path(dir)) {
 					ast_log(LOG_ERROR, "Couldn't lock directory %s.  Voicemail will be lost.\n", dir);
-					/* Delete files */
 					ast_filedelete(tmptxtfile, NULL);
 					unlink(tmptxtfile);
 				} else if (ast_fileexists(tmptxtfile, NULL, NULL) <= 0) {
-					if (option_debug) 
+					if (option_debug)
 						ast_log(LOG_DEBUG, "The recorded media file is gone, so we should remove the .txt file too!\n");
 					unlink(tmptxtfile);
 					ast_unlock_path(dir);
@@ -2785,14 +2757,19 @@ static int leave_voicemail(struct ast_channel *chan, char *ext, struct leave_vm_
 							break;
 						msgnum++;
 					}
-
-					/* assign a variable with the name of the voicemail file */	  
+					
+					/* assign a variable with the name of the voicemail file */
 					pbx_builtin_setvar_helper(chan, "VM_MESSAGEFILE", fn);
-
+					
 					snprintf(txtfile, sizeof(txtfile), "%s.txt", fn);
 					ast_filerename(tmptxtfile, fn, NULL);
 					rename(tmptxtfile, txtfile);
-
+					
+					if(chmod(txtfile, VOICEMAIL_FILE_MODE) == -1) {
+						ast_log(LOG_WARNING, "chmod '%s' failed: %s\n", txtfile, strerror(errno));
+					}
+                	chmod_voicefiles(fn, fmt);
+                	
 					ast_unlock_path(dir);
 
 					/* We must store the file first, before copying the message, because
